@@ -41,7 +41,10 @@
 
 ### Области (scope)
 
-`server`, `client`, `db`, `api`, `ui`, `ci`, `deps`, `docs`.
+`server`, `client`, `db`, `api`, `ui`, `ci`, `deps`, `docs`, `main`.
+
+Область `main` зарезервирована под автоматические коммиты release-please
+(`chore(main): release ...`), вручную её использовать не нужно.
 
 ### Ломающие изменения
 

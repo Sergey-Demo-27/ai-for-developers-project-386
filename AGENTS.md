@@ -32,8 +32,8 @@ Root: `npm run lint:last` checks the last commit message.
   is expected). `data/` is gitignored and auto-created.
 - Migrations must stay idempotent at the SQL level (`CREATE TABLE IF NOT EXISTS`).
 - Conventional Commits are enforced locally and in CI; header ≤ 72 chars, allowed
-  scopes: `server`, `client`, `db`, `api`, `ui`, `ci`, `deps`, `docs`
-  (see `CONTRIBUTING.md`).
+  scopes: `server`, `client`, `db`, `api`, `ui`, `ci`, `deps`, `docs`, `main`
+  (`main` — для авто‑коммитов release-please); see `CONTRIBUTING.md`.
 - CI `ci.yml` runs three jobs: `server` (`npm ci` → `lint` → `test` →
   `migrate` → `smoke`), `client` (`npm ci` → `lint` → `test` → `build`) and
   `commitlint`. `release-please` versions `server/` and `client/` separately.
