@@ -1,0 +1,46 @@
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@mantine/core": "^9.7.2",
+    "@mantine/dates": "^9.7.2",
+    "@mantine/form": "^9.7.2",
+    "@mantine/hooks": "^9.7.2",
+    "@mantine/modals": "^9.7.2",
+    "@mantine/notifications": "^9.7.2",
+    "dayjs": "^1.11.23",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.4",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.81.0",
+    "postcss": "^8.5.29",
+    "postcss-preset-mantine": "^1.18.0",
+    "postcss-simple-vars": "^7.0.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.4"
+  }
+}
