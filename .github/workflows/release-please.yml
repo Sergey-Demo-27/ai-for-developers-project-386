@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  # Ручной запуск из вкладки Actions (удобно для теста, без пустого push).
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # Анализирует Conventional Commits в main, создаёт/обновляет release PR
+      # (бамп версии + CHANGELOG), а после его мержа — тег и GitHub Release.
+      # Пакеты и их версии описаны в release-please-config.json.
+      - uses: googleapis/release-please-action@v4
+        with:
+          # Если задан секрет RELEASE_PLEASE_TOKEN (fine-grained PAT с правами
+          # contents: write и pull-requests: write) — используем его, чтобы
+          # release PR запускал ci.yml. Иначе работает на стандартном GITHUB_TOKEN
+          # (release PR не будет триггерить другие workflow).
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
