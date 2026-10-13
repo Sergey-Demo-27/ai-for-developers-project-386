@@ -1,0 +1,5 @@
+/* Глобальные стили приложения.
+   Стили Mantine подключаются отдельно — в app/providers/Providers.tsx. */
+body {
+  margin: 0;
+}
