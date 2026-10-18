@@ -21,8 +21,13 @@ export function createApp({ db } = {}) {
     res.json({ status: 'ok' });
   });
 
-  // Здесь будут монтироваться маршруты по мере появления функционала:
-  //   app.use('/api/...', router);
+  // Заготовки маршрутов и их валидация сгенерированы из контракта в
+  // `src/generated/routes.js` (см. `npm run generate:api` и README). Пока
+  // обработчики не написаны, они не смонтированы: запрос под `/api/...`
+  // остаётся `404 not_found`. Смонтируйте здесь `apiRouter`, когда появится
+  // первая реализация:
+  //   import { apiRouter } from './generated/routes.js';
+  //   app.use(apiRouter);
 
   app.use(notFound);
   app.use(errorHandler);
