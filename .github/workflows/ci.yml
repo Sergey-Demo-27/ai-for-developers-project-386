@@ -25,6 +25,14 @@ jobs:
 
       - run: npm run lint
 
+      # Сгенерированные серверные артефакты (типы, валидация, заготовки
+      # маршрутов) закоммичены: если они разошлись с контрактом
+      # (api/openapi/openapi.yaml), этот шаг это покажет. Путь указывается
+      # относительно working-directory.
+      - run: npm run generate:api
+
+      - run: git diff --exit-code -- src/generated
+
       - run: npm test
 
       - run: npm run migrate
@@ -52,6 +60,37 @@ jobs:
       - run: npm test
 
       - run: npm run build
+
+      # Сгенерированный клиентский SDK закоммичен: если он разошёлся с
+      # контрактом (api/openapi/openapi.yaml), этот шаг это покажет. Путь
+      # указывается относительно working-directory.
+      - run: npm run generate:api
+
+      - run: git diff --exit-code -- src/shared/api/generated
+
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run build
+
+      # Сгенерированная спецификация закоммичена: если она разошлась с .tsp,
+      # сборка это покажет. Путь указывается относительно working-directory.
+      - run: git diff --exit-code -- openapi
 
   commitlint:
     runs-on: ubuntu-latest
