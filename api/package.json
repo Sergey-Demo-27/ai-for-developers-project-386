@@ -1,0 +1,20 @@
+{
+  "name": "call-calendar-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Контракт API календаря звонков на TypeSpec и сборка OpenAPI-спецификации",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsp compile . --warn-as-error",
+    "lint": "tsp format --check \"**/*.tsp\" && tsp compile . --no-emit --warn-as-error"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "^1.17.0",
+    "@typespec/http": "^1.17.0",
+    "@typespec/openapi": "^1.17.0",
+    "@typespec/openapi3": "^1.17.0"
+  }
+}
