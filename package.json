@@ -8,6 +8,8 @@
     "node": ">=24"
   },
   "scripts": {
+    "generate:api": "npm --prefix api run build && npm --prefix server run generate:api && npm --prefix client run generate:api",
+    "generate:api:check": "npm run generate:api && git diff --exit-code -- api/openapi server/src/generated client/src/shared/api/generated",
     "lint:last": "commitlint --last",
     "prepare": "husky"
   },
