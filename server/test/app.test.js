@@ -25,6 +25,20 @@ test('приложение отвечает 404 в едином JSON-форма�
   assert.equal(typeof body.error.message, 'string');
 });
 
+test('битый JSON даёт 400 invalid_json, а не 500', async () => {
+  const res = await fetch(`${server.baseUrl}/anything`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{',
+  });
+
+  assert.equal(res.status, 400);
+
+  const body = await res.json();
+  assert.equal(body.error.status, 400);
+  assert.equal(body.error.code, 'invalid_json');
+});
+
 test('применение пустой схемы не завершается ошибкой', () => {
   const db = openDatabase(':memory:');
   try {
