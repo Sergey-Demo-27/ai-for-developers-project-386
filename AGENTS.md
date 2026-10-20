@@ -82,8 +82,10 @@ committed.
 - `client/src/` follows Feature-Sliced Design: layers `app → pages → widgets →
   shared` (top to bottom). A slice may import only from layers **below** it and
   only through the slice's public API (`index.ts`). Layers and slices appear
-  lazily, when first needed — no empty scaffolding. No router yet: pages are
-  linked with plain `<a href>`; the router lands with the first real route.
+  lazily, when first needed — no empty scaffolding. The router is `react-router`
+  in Declarative mode: pages link with `<Link>`/`<NavLink>`, routing config lives
+  in the `app/routes` slice, and route path constants live in `shared/routes`
+  (both `widgets/header` and `pages/*` read them, so they cannot live above).
 
 ## Agent skills
 

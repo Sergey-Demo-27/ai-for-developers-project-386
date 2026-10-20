@@ -12,7 +12,7 @@ describe('Header', () => {
     )
   })
 
-  it('содержит навигацию на запись и предстоящие события', () => {
+  it('содержит навигацию по трём разделам', () => {
     renderWithProviders(<Header />)
 
     expect(screen.getByRole('link', { name: 'Записаться' })).toHaveAttribute(
@@ -20,7 +20,21 @@ describe('Header', () => {
       '/booking',
     )
     expect(
-      screen.getByRole('link', { name: 'Предстоящие события' }),
-    ).toHaveAttribute('href', '/events')
+      screen.getByRole('link', { name: 'Предстоящие брони' }),
+    ).toHaveAttribute('href', '/bookings')
+    expect(
+      screen.getByRole('link', { name: 'Типы событий' }),
+    ).toHaveAttribute('href', '/event-types')
+  })
+
+  it('подсвечивает текущий раздел', () => {
+    renderWithProviders(<Header />, { route: '/bookings' })
+
+    expect(
+      screen.getByRole('link', { name: 'Предстоящие брони' }),
+    ).toHaveAttribute('aria-current', 'page')
+    expect(
+      screen.getByRole('link', { name: 'Записаться' }),
+    ).not.toHaveAttribute('aria-current')
   })
 })

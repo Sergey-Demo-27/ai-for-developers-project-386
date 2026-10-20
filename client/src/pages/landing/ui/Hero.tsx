@@ -1,7 +1,9 @@
 import { Badge, Button, Stack, Text, Title } from '@mantine/core'
+import { Link } from 'react-router'
+import { routes } from '../../../shared/routes'
 
 // Герой главной страницы: оффер и кнопка «Записаться».
-// Кнопка — обычная ссылка на будущую страницу записи (/booking).
+// Кнопка — ссылка роутера на страницу записи: переход без перезагрузки.
 export function Hero() {
   return (
     <Stack gap="lg" align="flex-start">
@@ -27,8 +29,8 @@ export function Hero() {
       </Text>
 
       <Button
-        component="a"
-        href="/booking"
+        component={Link}
+        to={routes.booking}
         size="lg"
         radius="md"
         rightSection={<span aria-hidden="true">→</span>}
