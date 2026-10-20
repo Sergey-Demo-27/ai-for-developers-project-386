@@ -1,4 +1,6 @@
 import express from 'express';
+import { createApiRouter } from './generated/routes.js';
+import { handlers } from './routes/index.js';
 import notFound from './middleware/notFound.js';
 import errorHandler from './middleware/errorHandler.js';
 
@@ -21,13 +23,10 @@ export function createApp({ db } = {}) {
     res.json({ status: 'ok' });
   });
 
-  // Заготовки маршрутов и их валидация сгенерированы из контракта в
-  // `src/generated/routes.js` (см. `npm run generate:api` и README). Пока
-  // обработчики не написаны, они не смонтированы: запрос под `/api/...`
-  // остаётся `404 not_found`. Смонтируйте здесь `apiRouter`, когда появится
-  // первая реализация:
-  //   import { apiRouter } from './generated/routes.js';
-  //   app.use(apiRouter);
+  // Маршруты контракта собираются сгенерированным роутером: пути и валидация
+  // тел приходят из OpenAPI, реализация — из `src/routes/index.js` по
+  // `operationId`. Операции без обработчика пока отвечают `501 not_implemented`.
+  app.use(createApiRouter(handlers));
 
   app.use(notFound);
   app.use(errorHandler);

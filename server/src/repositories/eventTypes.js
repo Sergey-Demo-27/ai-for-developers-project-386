@@ -1,0 +1,43 @@
+// Репозиторий типов событий: доступ к таблице `event_types`.
+//
+// Соединение приходит снаружи (req.app.locals.db) — репозиторий не знает,
+// откуда оно взялось, и остаётся проверяемым на in-memory базе.
+
+/** @typedef {import('../generated/types.js').EventType} EventType */
+
+// Колонки таблицы в порядке контракта — один список на оба запроса.
+const COLUMNS = 'id, name, description, duration_minutes';
+
+// Строка таблицы (snake_case) → тип контракта (camelCase).
+function toEventType(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    durationMinutes: row.duration_minutes,
+  };
+}
+
+// Все типы в порядке возрастания `id` — как требует контракт.
+export function listEventTypes(db) {
+  const rows = db
+    .prepare(`SELECT ${COLUMNS} FROM event_types ORDER BY id`)
+    .all();
+
+  return rows.map(toEventType);
+}
+
+// Вставляет тип и возвращает созданную строку. `id` генерирует SQLite.
+export function insertEventType(db, { name, description, durationMinutes }) {
+  const { lastInsertRowid } = db
+    .prepare(
+      'INSERT INTO event_types (name, description, duration_minutes) VALUES (?, ?, ?)',
+    )
+    .run(name, description, durationMinutes);
+
+  const row = db
+    .prepare(`SELECT ${COLUMNS} FROM event_types WHERE id = ?`)
+    .get(lastInsertRowid);
+
+  return toEventType(row);
+}

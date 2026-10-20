@@ -39,9 +39,10 @@ test('битый JSON даёт 400 invalid_json, а не 500', async () => {
   assert.equal(body.error.code, 'invalid_json');
 });
 
-test('применение пустой схемы не завершается ошибкой', () => {
+test('применение схемы идемпотентно', () => {
   const db = openDatabase(':memory:');
   try {
+    assert.equal(migrate(db), true);
     assert.doesNotThrow(() => migrate(db));
   } finally {
     db.close();

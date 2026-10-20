@@ -1,0 +1,12 @@
+// Обработчики операций контракта, сгруппированные по `operationId`.
+//
+// Сгенерированный роутер (`src/generated/routes.js`) подставляет их в маршруты
+// по имени операции; операции без обработчика отвечают `501 not_implemented`.
+// Новые ресурсы добавляются сюда по мере реализации.
+
+import { createEventTypeHandler, listEventTypesHandler } from './eventTypes.js';
+
+export const handlers = {
+  EventTypes_list: listEventTypesHandler,
+  EventTypes_create: createEventTypeHandler,
+};

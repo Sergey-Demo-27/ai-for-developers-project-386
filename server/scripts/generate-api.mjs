@@ -202,7 +202,7 @@ function renderRoutes(banner, operations) {
   );
 
   const mounts = [...byResource.keys()]
-    .map((resource) => `apiRouter.use(${camel(resource)}Router);`)
+    .map((resource) => `  apiRouter.use(${camel(resource)}Router);`)
     .join('\n');
 
   return `${banner}
@@ -210,8 +210,7 @@ import { Router } from 'express';
 import { validateBody } from '../middleware/validate.js';
 
 // Заготовка обработчика: маршрут зарегистрирован по контракту, но логика ещё
-// не написана. Ответ 501 — временная заглушка каркаса, в контракт не входит;
-// монтирование в приложение — дело \`src/app.js\` (см. README).
+// не написана. Ответ 501 — временная заглушка каркаса, в контракт не входит.
 function stub(operationId) {
   return (req, res) => {
     res.status(501).json({
@@ -224,10 +223,22 @@ function stub(operationId) {
   };
 }
 
+/**
+ * Собирает Express-роутер из маршрутов контракта. Тела запросов проверяются
+ * схемами OpenAPI; реализацию подставляет вызывающий — по \`operationId\`.
+ *
+ * @param {Record<string, import('express').RequestHandler>} [handlers]
+ *   обработчики операций по \`operationId\`; для операции без обработчика
+ *   маршрут отвечает 501 not_implemented.
+ * @returns {import('express').Router}
+ */
+export function createApiRouter(handlers = {}) {
 ${routers.join('\n')}
-/** Все сгенерированные маршруты контракта. */
-export const apiRouter = Router();
+  /** Все сгенерированные маршруты контракта. */
+  const apiRouter = Router();
 ${mounts}
+  return apiRouter;
+}
 `;
 }
 
@@ -236,12 +247,13 @@ function renderRouter(resource, ops) {
   const routes = ops
     .map((op) => {
       const middlewares = op.bodySchema ? `validateBody('${op.bodySchema}'), ` : '';
-      return `// ${op.summary}\n${name}.${op.method}('${op.expressPath}', ${middlewares}stub('${op.operationId}'));`;
+      const handler = `handlers['${op.operationId}'] ?? stub('${op.operationId}')`;
+      return `  // ${op.summary}\n  ${name}.${op.method}('${op.expressPath}', ${middlewares}${handler});`;
     })
     .join('\n');
 
-  return `/** Ресурс «${resource}». */
-export const ${name} = Router();
+  return `  /** Ресурс «${resource}». */
+  const ${name} = Router();
 ${routes}
 `;
 }

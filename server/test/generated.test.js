@@ -2,19 +2,19 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import express from 'express';
-import { apiRouter } from '../src/generated/routes.js';
+import { createApiRouter } from '../src/generated/routes.js';
 import notFound from '../src/middleware/notFound.js';
 import errorHandler from '../src/middleware/errorHandler.js';
 
-// Сгенерированные заготовки маршрутов в приложение пока не смонтированы
-// (см. src/app.js), поэтому тест собирает приложение из них напрямую.
+// Сгенерированный роутер собирается фабрикой: без обработчиков операции
+// отвечают 501, переданный обработчик подставляется по `operationId`.
 let server;
 let baseUrl;
 
 before(async () => {
   const app = express();
   app.use(express.json());
-  app.use(apiRouter);
+  app.use(createApiRouter());
   app.use(notFound);
   app.use(errorHandler);
 
@@ -55,4 +55,30 @@ test('неизвестный путь под /api остаётся 404 not_found
 
   assert.equal(res.status, 404);
   assert.equal((await res.json()).error.code, 'not_found');
+});
+
+test('переданный обработчик подставляется в маршрут по operationId', async () => {
+  const app = express();
+  app.use(express.json());
+  app.use(
+    createApiRouter({
+      EventTypes_list: (req, res) => res.json({ eventTypes: [] }),
+    }),
+  );
+  app.use(notFound);
+  app.use(errorHandler);
+
+  const local = app.listen(0);
+  await once(local, 'listening');
+
+  try {
+    const res = await fetch(
+      `http://127.0.0.1:${local.address().port}/api/event-types`,
+    );
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { eventTypes: [] });
+  } finally {
+    await new Promise((resolve) => local.close(resolve));
+  }
 });
