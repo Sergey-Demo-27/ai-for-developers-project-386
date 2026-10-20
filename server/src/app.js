@@ -7,15 +7,17 @@ import errorHandler from './middleware/errorHandler.js';
 // Собирает Express-приложение. Сознательно НЕ вызывает listen —
 // это делает server.js, а тесты поднимают приложение на своём порту.
 //
-// Необязательный `db` кладётся в app.locals, чтобы будущие репозитории
-// могли получить соединение через req.app.locals.db.
-export function createApp({ db } = {}) {
+// Необязательные `db` и `now` кладутся в app.locals, чтобы репозитории
+// получали соединение через req.app.locals.db, а обработчики, зависящие от
+// текущего момента, — часы через req.app.locals.now (тесты подставляют свои).
+export function createApp({ db, now } = {}) {
   const app = express();
 
   app.disable('x-powered-by');
   app.use(express.json());
 
   app.locals.db = db ?? null;
+  app.locals.now = now ?? (() => new Date());
 
   // Проверка живости: используется дымовым тестом (`npm run smoke`) и CI,
   // чтобы убедиться, что приложение поднялось и отвечает.

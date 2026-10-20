@@ -5,8 +5,10 @@
 // Новые ресурсы добавляются сюда по мере реализации.
 
 import { createEventTypeHandler, listEventTypesHandler } from './eventTypes.js';
+import { listSlotsHandler } from './slots.js';
 
 export const handlers = {
   EventTypes_list: listEventTypesHandler,
   EventTypes_create: createEventTypeHandler,
+  EventTypeSlots_list: listSlotsHandler,
 };

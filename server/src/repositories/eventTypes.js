@@ -27,6 +27,15 @@ export function listEventTypes(db) {
   return rows.map(toEventType);
 }
 
+// Тип по `id` или `undefined`, если такого типа нет.
+export function getEventTypeById(db, id) {
+  const row = db
+    .prepare(`SELECT ${COLUMNS} FROM event_types WHERE id = ?`)
+    .get(id);
+
+  return row ? toEventType(row) : undefined;
+}
+
 // Вставляет тип и возвращает созданную строку. `id` генерирует SQLite.
 export function insertEventType(db, { name, description, durationMinutes }) {
   const { lastInsertRowid } = db
@@ -35,9 +44,5 @@ export function insertEventType(db, { name, description, durationMinutes }) {
     )
     .run(name, description, durationMinutes);
 
-  const row = db
-    .prepare(`SELECT ${COLUMNS} FROM event_types WHERE id = ?`)
-    .get(lastInsertRowid);
-
-  return toEventType(row);
+  return getEventTypeById(db, lastInsertRowid);
 }

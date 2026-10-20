@@ -3,10 +3,11 @@ import createApp from '../../src/app.js';
 import { openDatabase } from '../../src/db/index.js';
 
 // Поднимает приложение на in-memory БД и произвольном свободном порту.
+// `now` позволяет подставить детерминированные часы; без него — реальные.
 // Возвращает baseUrl для глобального fetch и функцию закрытия ресурсов.
-export async function startTestServer() {
+export async function startTestServer({ now } = {}) {
   const db = openDatabase(':memory:');
-  const app = createApp({ db });
+  const app = createApp({ db, now });
 
   const server = app.listen(0);
   await once(server, 'listening');
