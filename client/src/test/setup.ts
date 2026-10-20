@@ -17,3 +17,12 @@ if (typeof window.matchMedia !== 'function') {
       dispatchEvent: () => false,
     }) as MediaQueryList
 }
+
+// jsdom не реализует ResizeObserver, а Mantine использует его в ScrollArea.
+if (typeof window.ResizeObserver !== 'function') {
+  window.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof window.ResizeObserver
+}

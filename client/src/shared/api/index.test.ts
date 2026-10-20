@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { eventTypesCreate, eventTypesList } from './index'
+import { ApiError, eventTypesCreate, eventTypesList, unwrap } from './index'
 
 // Ответы-заглушки в форме контракта (api/openapi/openapi.yaml).
 const eventType = {
@@ -62,5 +62,55 @@ describe('сгенерированный SDK', () => {
       name: 'Консультация',
       durationMinutes: 30,
     })
+  })
+
+  it('разворачивает данные успешного ответа', async () => {
+    stubFetch({ eventTypes: [eventType] })
+
+    const data = await unwrap(eventTypesList({ throwOnError: true }))
+
+    expect(data.eventTypes).toEqual([eventType])
+  })
+
+  it('разбирает конверт ошибки в ApiError', async () => {
+    stubFetch(
+      {
+        error: {
+          status: 400,
+          code: 'validation_error',
+          message: 'Некорректные данные запроса',
+          details: [{ field: 'name', message: 'Поле не может быть пустым' }],
+        },
+      },
+      400,
+    )
+
+    const error = await unwrap(
+      eventTypesList({ throwOnError: true }),
+    ).catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({
+      status: 400,
+      code: 'validation_error',
+      message: 'Некорректные данные запроса',
+      details: [{ field: 'name', message: 'Поле не может быть пустым' }],
+    })
+  })
+
+  it('сетевой сбой превращает в ApiError network_error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('network down')
+      }),
+    )
+
+    const error = await unwrap(
+      eventTypesList({ throwOnError: true }),
+    ).catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 0, code: 'network_error' })
   })
 })
