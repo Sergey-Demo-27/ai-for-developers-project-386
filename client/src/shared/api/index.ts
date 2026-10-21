@@ -12,6 +12,7 @@ export {
 export type {
   Booking,
   BookingCreate,
+  BookingListItem,
   Day,
   EventType,
   EventTypeCreate,

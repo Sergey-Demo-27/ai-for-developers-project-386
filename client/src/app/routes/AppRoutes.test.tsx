@@ -3,7 +3,28 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '../../test/render'
 import { AppRoutes } from './AppRoutes'
 
+// Страницы маршрутов сразу грузят данные. Без мока `fetch` тест ходил бы в сеть
+// (в jsdom origin — `http://localhost:3000`) и зависел бы от окружения: под
+// локальным сервером в ответ прилетает HTML, а не конверт контракта.
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 describe('AppRoutes', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ eventTypes: [], bookings: [] })),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('на / показывает лендинг внутри общего layout', () => {
     renderWithProviders(<AppRoutes />, { route: '/' })
 

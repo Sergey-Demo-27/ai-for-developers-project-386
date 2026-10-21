@@ -28,6 +28,24 @@ export function formatSlotRange(start: string, end: string): string {
   return `${start} - ${end}`
 }
 
+// Минуты между началом и концом слота (`HH:MM`) — из них складывается
+// длительность брони, когда тип события в списке не отдан.
+export function minutesBetween(start: string, end: string): number {
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number)
+    return hours * 60 + minutes
+  }
+
+  return toMinutes(end) - toMinutes(start)
+}
+
+// Момент создания брони для списка: «27.03.2026, 14:40». `createdAt` — момент
+// времени (UTC-инстант в контракте), показываем его по локальным настенным
+// часам зрителя, как и остальные даты приложения (ADR 0002).
+export function formatCreatedAt(createdAt: string): string {
+  return dayjs(createdAt).format('DD.MM.YYYY, HH:mm')
+}
+
 // Длительность типа события: «30 мин».
 export function formatDuration(minutes: number): string {
   return `${minutes} мин`
