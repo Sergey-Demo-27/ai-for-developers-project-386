@@ -11,13 +11,19 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-// Общий мок `fetch`: запрос слотов отличаем по URL, всё остальное — список типов.
+// Общий мок `fetch`: запрос брони, слотов и список типов отличаем по URL.
 // Колбэки могут бросить — так проверяем сетевые сбои.
 function stubApi(handlers: {
   eventTypes?: () => unknown
   slots?: (id: string) => unknown
+  booking?: (body: Record<string, unknown>) => unknown
 }) {
   const fetchMock = vi.fn(async (request: Request) => {
+    if (request.url.includes('/bookings')) {
+      const body = JSON.parse(await request.text()) as Record<string, unknown>
+      const response = handlers.booking ? await handlers.booking(body) : { booking: body }
+      return response instanceof Response ? response : jsonResponse(response, 201)
+    }
     const match = request.url.match(/\/event-types\/([^/]+)\/slots/)
     if (match) {
       const body = handlers.slots ? await handlers.slots(match[1]) : { days: [] }
@@ -71,6 +77,21 @@ const days = [
     ],
   },
 ]
+
+// Доводит гостя до шага подтверждения: выбор типа, свободного слота и «Продолжить».
+async function goToConfirmation() {
+  await userEvent.click(
+    await screen.findByRole('button', { name: /Консультация/ }),
+  )
+  const slots = await screen.findByRole('region', { name: 'Статус слотов' })
+  await userEvent.click(
+    within(slots).getByRole('button', { name: '11:00 - 11:30' }),
+  )
+  await userEvent.click(
+    within(slots).getByRole('button', { name: 'Продолжить' }),
+  )
+  return screen.findByRole('region', { name: 'Подтверждение записи' })
+}
 
 describe('BookingPage', () => {
   beforeEach(() => {
@@ -524,5 +545,345 @@ describe('BookingPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Повторить' }))
 
     expect(await screen.findByText('11:00 - 11:30')).toBeInTheDocument()
+  })
+
+  it('«Продолжить» открывает подтверждение со сводкой и подписанными полями', async () => {
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => ({ days }),
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+
+    expect(
+      within(confirm).getByText(
+        'Консультация · 30 мин · четверг, 15 октября · 11:00 - 11:30',
+      ),
+    ).toBeInTheDocument()
+    expect(within(confirm).getByLabelText(/Имя/)).toBeInTheDocument()
+    expect(within(confirm).getByLabelText(/Email/)).toBeInTheDocument()
+    expect(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    ).toBeDisabled()
+  })
+
+  it('«Изменить» возвращает к выбору слота, сохраняя тип, дату и слот', async () => {
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => ({ days }),
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+
+    await userEvent.click(
+      within(confirm).getByRole('button', { name: 'Изменить' }),
+    )
+
+    const info = screen.getByRole('region', { name: 'Информация' })
+    expect(within(info).getByText('четверг, 15 октября')).toBeInTheDocument()
+    expect(within(info).getByText('11:00 - 11:30')).toBeInTheDocument()
+
+    const slots = screen.getByRole('region', { name: 'Статус слотов' })
+    expect(
+      within(slots).getByRole('button', { name: 'Продолжить' }),
+    ).toBeEnabled()
+  })
+
+  it('держит «Подтвердить запись» заблокированной, пока форма невалидна', async () => {
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => ({ days }),
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+
+    const submit = within(confirm).getByRole('button', {
+      name: 'Подтвердить запись',
+    })
+    expect(submit).toBeDisabled()
+
+    await userEvent.type(within(confirm).getByLabelText(/Имя/), 'Иван')
+    expect(submit).toBeDisabled()
+
+    const email = within(confirm).getByLabelText(/Email/)
+    await userEvent.type(email, 'не-email')
+    expect(submit).toBeDisabled()
+
+    await userEvent.clear(email)
+    await userEvent.type(email, 'ivan@example.com')
+    expect(submit).toBeEnabled()
+  })
+
+  it('раскладывает 400 validation_error по полям подтверждения', async () => {
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => ({ days }),
+      booking: () =>
+        jsonResponse(
+          {
+            error: {
+              status: 400,
+              code: 'validation_error',
+              message: 'Некорректные данные запроса',
+              details: [
+                { field: 'guestEmail', message: 'Укажите корректный email' },
+              ],
+            },
+          },
+          400,
+        ),
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+
+    await userEvent.type(within(confirm).getByLabelText(/Имя/), 'Иван')
+    await userEvent.type(
+      within(confirm).getByLabelText(/Email/),
+      'ivan@example.com',
+    )
+    await userEvent.click(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    )
+
+    expect(
+      await screen.findByText('Укажите корректный email'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Некорректные данные запроса')).toBeInTheDocument()
+  })
+
+  it('при 409 возвращает к выбору слота, сохраняя тип, дату, имя и email', async () => {
+    const afterBookingDays = [
+      {
+        date: TODAY,
+        slots: [
+          slot('09:00', '09:30', false),
+          slot('11:00', '11:30', false),
+          slot('12:00', '12:30', false),
+          slot('13:00', '13:30', true),
+        ],
+      },
+      days[1],
+    ]
+    let slotsCalls = 0
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => {
+        slotsCalls += 1
+        return slotsCalls === 1 ? { days } : { days: afterBookingDays }
+      },
+      booking: () =>
+        jsonResponse(
+          {
+            error: {
+              status: 409,
+              code: 'slot_taken',
+              message: 'Это время уже занято, выберите другой слот',
+            },
+          },
+          409,
+        ),
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+    await userEvent.type(within(confirm).getByLabelText(/Имя/), 'Иван')
+    await userEvent.type(
+      within(confirm).getByLabelText(/Email/),
+      'ivan@example.com',
+    )
+    await userEvent.click(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    )
+
+    // Возврат к выбору слота; список перезагружен — занятый слот стал «Занято».
+    const slots = await screen.findByRole('region', { name: 'Статус слотов' })
+    expect(
+      within(slots).getByRole('button', { name: '11:00 - 11:30' }),
+    ).toBeDisabled()
+
+    // Слот сброшен, тип и дата сохранены.
+    const info = screen.getByRole('region', { name: 'Информация' })
+    expect(within(info).getByText('Время не выбрано')).toBeInTheDocument()
+    expect(within(info).getByText('четверг, 15 октября')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Консультация/ }),
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    // Имя и email сохранены: форма открывается с введёнными данными.
+    await userEvent.click(
+      within(slots).getByRole('button', { name: '13:00 - 13:30' }),
+    )
+    await userEvent.click(
+      within(slots).getByRole('button', { name: 'Продолжить' }),
+    )
+    const again = await screen.findByRole('region', {
+      name: 'Подтверждение записи',
+    })
+    expect(within(again).getByLabelText(/Имя/)).toHaveValue('Иван')
+    expect(within(again).getByLabelText(/Email/)).toHaveValue(
+      'ivan@example.com',
+    )
+  })
+
+  it('при 500 сохраняет введённое и снова включает кнопку', async () => {
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => ({ days }),
+      booking: () =>
+        jsonResponse(
+          {
+            error: {
+              status: 500,
+              code: 'internal_error',
+              message: 'Внутренняя ошибка',
+            },
+          },
+          500,
+        ),
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+    await userEvent.type(within(confirm).getByLabelText(/Имя/), 'Иван')
+    await userEvent.type(
+      within(confirm).getByLabelText(/Email/),
+      'ivan@example.com',
+    )
+    await userEvent.click(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    )
+
+    const still = await screen.findByRole('region', {
+      name: 'Подтверждение записи',
+    })
+    expect(within(still).getByLabelText(/Имя/)).toHaveValue('Иван')
+    expect(within(still).getByLabelText(/Email/)).toHaveValue('ivan@example.com')
+    expect(
+      within(still).getByRole('button', { name: 'Подтвердить запись' }),
+    ).toBeEnabled()
+  })
+
+  it('при сетевом сбое сохраняет введённое и снова включает кнопку', async () => {
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => ({ days }),
+      booking: () => {
+        throw new TypeError('network down')
+      },
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+    await userEvent.type(within(confirm).getByLabelText(/Имя/), 'Иван')
+    await userEvent.type(
+      within(confirm).getByLabelText(/Email/),
+      'ivan@example.com',
+    )
+    await userEvent.click(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    )
+
+    const still = await screen.findByRole('region', {
+      name: 'Подтверждение записи',
+    })
+    expect(within(still).getByLabelText(/Имя/)).toHaveValue('Иван')
+    expect(
+      within(still).getByRole('button', { name: 'Подтвердить запись' }),
+    ).toBeEnabled()
+  })
+
+  it('блокирует «Подтвердить запись» на время запроса', async () => {
+    let resolveBooking: (response: Response) => void = () => {}
+    const pending = new Promise<Response>((resolve) => {
+      resolveBooking = resolve
+    })
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => ({ days }),
+      booking: () => pending,
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+    await userEvent.type(within(confirm).getByLabelText(/Имя/), 'Иван')
+    await userEvent.type(
+      within(confirm).getByLabelText(/Email/),
+      'ivan@example.com',
+    )
+
+    await userEvent.click(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    )
+
+    expect(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    ).toBeDisabled()
+
+    await act(async () => {
+      resolveBooking(jsonResponse({ booking: {} }, 201))
+    })
+
+    expect(
+      await screen.findByText('Бронь подтверждена. До встречи!'),
+    ).toBeInTheDocument()
+  })
+
+  it('успех показывает подтверждение, а «Забронировать ещё» сохраняет тип и дату и сбрасывает слот', async () => {
+    const afterBookingDays = [
+      {
+        date: TODAY,
+        slots: [
+          slot('09:00', '09:30', false),
+          slot('11:00', '11:30', false),
+          slot('12:00', '12:30', false),
+          slot('13:00', '13:30', true),
+        ],
+      },
+      days[1],
+    ]
+    let slotsCalls = 0
+    stubApi({
+      eventTypes: () => ({ eventTypes: [consultation] }),
+      slots: () => {
+        slotsCalls += 1
+        return slotsCalls === 1 ? { days } : { days: afterBookingDays }
+      },
+    })
+
+    renderWithProviders(<BookingPage />)
+    const confirm = await goToConfirmation()
+    await userEvent.type(within(confirm).getByLabelText(/Имя/), 'Иван')
+    await userEvent.type(
+      within(confirm).getByLabelText(/Email/),
+      'ivan@example.com',
+    )
+    await userEvent.click(
+      within(confirm).getByRole('button', { name: 'Подтвердить запись' }),
+    )
+
+    expect(
+      await screen.findByText('Бронь подтверждена. До встречи!'),
+    ).toBeInTheDocument()
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Забронировать ещё' }),
+    )
+
+    // Тип и дата сохранены, слот сброшен, список перезагружен.
+    const info = screen.getByRole('region', { name: 'Информация' })
+    expect(within(info).getByText('четверг, 15 октября')).toBeInTheDocument()
+    expect(within(info).getByText('Время не выбрано')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Консультация/ }),
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    const slots = await screen.findByRole('region', { name: 'Статус слотов' })
+    expect(
+      within(slots).getByRole('button', { name: '11:00 - 11:30' }),
+    ).toBeDisabled()
   })
 })

@@ -14,6 +14,7 @@ type SlotsPanelProps = {
   selectedSlot: Slot | null
   onSelectSlot: (slot: Slot) => void
   canContinue: boolean
+  onContinue: () => void
 }
 
 // Панель «Статус слотов»: строки «09:00 - 09:30» со статусом «Свободно»/«Занято».
@@ -26,6 +27,7 @@ export function SlotsPanel({
   selectedSlot,
   onSelectSlot,
   canContinue,
+  onContinue,
 }: SlotsPanelProps) {
   const today = todayString()
   const now = currentTimeString()
@@ -76,7 +78,7 @@ export function SlotsPanel({
           )}
         </Box>
 
-        <BookingActions canContinue={canContinue} />
+        <BookingActions canContinue={canContinue} onContinue={onContinue} />
       </Stack>
     </Paper>
   )

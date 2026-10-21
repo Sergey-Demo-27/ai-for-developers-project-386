@@ -11,9 +11,11 @@ import { ListState } from '../../../shared/ui'
 import { countAvailable, firstAvailableDate } from '../lib/slots'
 import { BookingActions } from './BookingActions'
 import { CalendarPanel } from './CalendarPanel'
+import { ConfirmPanel } from './ConfirmPanel'
 import { EventTypePicker } from './EventTypePicker'
 import { InfoPanel } from './InfoPanel'
 import { SlotsPanel } from './SlotsPanel'
+import { SuccessPanel } from './SuccessPanel'
 
 // Экран записи на звонок. Шаги гостевого потока — состояния одного маршрута
 // `/booking`; этот срез покрывает выбор типа, даты и слота. Выбор живёт в
@@ -32,6 +34,13 @@ export function BookingPage() {
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null)
+
+  // Шаг гостевого потока — состояние страницы, не URL: `/booking` — один маршрут.
+  const [step, setStep] = useState<'select' | 'confirm' | 'success'>('select')
+  // Имя и email живут на странице: после `409` гость возвращается к выбору слота,
+  // и форма подтверждения должна открыться с уже введёнными данными.
+  const [guestName, setGuestName] = useState('')
+  const [guestEmail, setGuestEmail] = useState('')
 
   const slotsRequestId = useRef(0)
 
@@ -92,6 +101,30 @@ export function BookingPage() {
     void loadSlots(selectedEventTypeId)
   }, [loadSlots, selectedEventTypeId])
 
+  // Слот заняли, пока гость заполнял форму: возвращаем к выбору слота, сбрасываем
+  // слот и перезагружаем сетку. Тип, дата, имя и email сохраняются — гость
+  // выбирает новый слот и продолжает, не вводя данные заново.
+  const handleSlotTaken = useCallback(() => {
+    setSelectedSlot(null)
+    setStep('select')
+    reloadSlots()
+  }, [reloadSlots])
+
+  // Успех: показываем карточку подтверждения. Слот не сбрасываем — его сбросит
+  // «Забронировать ещё», когда гость вернётся к выбору.
+  const handleSuccess = useCallback(() => setStep('success'), [])
+
+  // «Забронировать ещё»: возврат к выбору, тип и дата сохраняются, слот и данные
+  // гостя сбрасываются, сетка перезагружается (только что забронированный слот —
+  // «Занято»).
+  const handleBookAgain = useCallback(() => {
+    setSelectedSlot(null)
+    setGuestName('')
+    setGuestEmail('')
+    setStep('select')
+    reloadSlots()
+  }, [reloadSlots])
+
   const selectEventType = useCallback(
     (id: number) => {
       if (id === selectedEventTypeId) return
@@ -100,6 +133,7 @@ export function BookingPage() {
       setSlotsDays([])
       setSlotsLoading(true)
       setSlotsError(null)
+      setStep('select')
     },
     [selectedEventTypeId],
   )
@@ -108,6 +142,16 @@ export function BookingPage() {
     setSelectedDate(date)
     setSelectedSlot(null)
   }, [])
+
+  // Значения формы подтверждения поднимаются на страницу, чтобы пережить
+  // возврат к выбору слота.
+  const handleGuestChange = useCallback(
+    (values: { guestName: string; guestEmail: string }) => {
+      setGuestName(values.guestName)
+      setGuestEmail(values.guestEmail)
+    },
+    [],
+  )
 
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- первичная загрузка списка; состояние ставится уже после await
@@ -156,7 +200,30 @@ export function BookingPage() {
           </Grid.Col>
 
           <Grid.Col span={{ base: 12, md: 8 }}>
-            {typesError ? null : selectedEventType ? (
+            {typesError ? null : selectedEventType === null ? (
+              <Paper radius="lg" p="xl" shadow="sm" withBorder h="100%">
+                <Stack justify="space-between" h="100%" gap="md">
+                  <Text c="dimmed">Выберите тип события</Text>
+                  <BookingActions canContinue={false} />
+                </Stack>
+              </Paper>
+            ) : step === 'success' ? (
+              <SuccessPanel onBookAgain={handleBookAgain} />
+            ) : step === 'confirm' &&
+              selectedDate !== null &&
+              selectedSlot !== null ? (
+              <ConfirmPanel
+                eventType={selectedEventType}
+                date={selectedDate}
+                slot={selectedSlot}
+                guestName={guestName}
+                guestEmail={guestEmail}
+                onGuestChange={handleGuestChange}
+                onEdit={() => setStep('select')}
+                onSlotTaken={handleSlotTaken}
+                onSuccess={handleSuccess}
+              />
+            ) : (
               <ListState
                 loading={slotsLoading}
                 error={slotsError}
@@ -177,17 +244,11 @@ export function BookingPage() {
                       selectedSlot={selectedSlot}
                       onSelectSlot={setSelectedSlot}
                       canContinue={canContinue}
+                      onContinue={() => setStep('confirm')}
                     />
                   </Grid.Col>
                 </Grid>
               </ListState>
-            ) : (
-              <Paper radius="lg" p="xl" shadow="sm" withBorder h="100%">
-                <Stack justify="space-between" h="100%" gap="md">
-                  <Text c="dimmed">Выберите тип события</Text>
-                  <BookingActions canContinue={false} />
-                </Stack>
-              </Paper>
             )}
           </Grid.Col>
         </Grid>
