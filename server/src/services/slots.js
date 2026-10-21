@@ -14,6 +14,30 @@ import {
 } from '../lib/time.js';
 
 /**
+ * Начала слотов типа: арифметическая прогрессия от 09:00 с шагом, равным
+ * длительности; слот существует, только если целиком влезает до 18:00
+ * (неполный остаток справа слотом не является). Единственное определение
+ * «реального слота» — им пользуются и сетка, и проверка брони
+ * (`services/booking.js`).
+ *
+ * @param {number} durationMinutes длительность типа — шаг сетки
+ * @returns {number[]} минуты от полуночи, по возрастанию
+ */
+export function slotStarts(durationMinutes) {
+  const starts = [];
+
+  for (
+    let start = WORKDAY_START_MINUTES;
+    start + durationMinutes <= WORKDAY_END_MINUTES;
+    start += durationMinutes
+  ) {
+    starts.push(start);
+  }
+
+  return starts;
+}
+
+/**
  * @param {object} input
  * @param {number} input.durationMinutes длительность типа — шаг сетки
  * @param {string} input.today сегодняшняя дата `YYYY-MM-DD`
@@ -35,13 +59,7 @@ export function buildSlotGrid({
     const booked = bookings.filter((booking) => booking.date === date);
     const slots = [];
 
-    // Слот существует, только если целиком влезает до конца рабочего дня:
-    // неполный остаток у правого края слотом не является.
-    for (
-      let start = WORKDAY_START_MINUTES;
-      start + durationMinutes <= WORKDAY_END_MINUTES;
-      start += durationMinutes
-    ) {
+    for (const start of slotStarts(durationMinutes)) {
       const end = start + durationMinutes;
 
       // Сегодня доступны только слоты, начинающиеся строго позже текущего

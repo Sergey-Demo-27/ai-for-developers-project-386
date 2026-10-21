@@ -33,6 +33,14 @@ export function addDays(dateString, days) {
   return `${shifted.getUTCFullYear()}-${shiftedMonth}-${shiftedDay}`;
 }
 
+// `HH:MM` → минуты от полуночи. Формат гарантирован схемой контракта,
+// поэтому разбор без проверок.
+export function parseTimeToMinutes(timeString) {
+  const [hours, minutes] = timeString.split(':').map(Number);
+
+  return hours * 60 + minutes;
+}
+
 // Минуты от полуночи → `HH:MM`.
 export function toTimeString(minutes) {
   const hours = String(Math.floor(minutes / 60)).padStart(2, '0');
