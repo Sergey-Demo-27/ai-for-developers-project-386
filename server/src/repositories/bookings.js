@@ -45,6 +45,38 @@ function toBooking(row) {
   };
 }
 
+// Предстоящие брони: только те, чей слот ещё не начался (GLOSSARY.md,
+// «Предстоящая бронь») — дата позже сегодняшней либо сегодняшняя с началом
+// строго в будущем. Порядок — по возрастанию даты, затем начала. Имя типа
+// приходит join'ом, длительность — из снимка брони.
+//
+// @returns {Array<import('../generated/types.js').BookingListItem>}
+export function listUpcomingBookings(db, { today, nowMinutes }) {
+  const rows = db
+    .prepare(
+      `SELECT b.id, b.date, b.start_minutes, b.duration_minutes,
+              b.guest_name, b.guest_email, b.created_at,
+              e.name AS event_type_name
+         FROM bookings AS b
+         JOIN event_types AS e ON e.id = b.event_type_id
+        WHERE b.date > ?
+           OR (b.date = ? AND b.start_minutes > ?)
+        ORDER BY b.date, b.start_minutes, b.id`,
+    )
+    .all(today, today, nowMinutes);
+
+  return rows.map((row) => ({
+    id: row.id,
+    date: row.date,
+    start: toTimeString(row.start_minutes),
+    end: toTimeString(row.start_minutes + row.duration_minutes),
+    eventTypeName: row.event_type_name,
+    guestName: row.guest_name,
+    guestEmail: row.guest_email,
+    createdAt: row.created_at,
+  }));
+}
+
 // Бронь по `id` или `undefined`, если такой брони нет.
 function getBookingById(db, id) {
   const row = db

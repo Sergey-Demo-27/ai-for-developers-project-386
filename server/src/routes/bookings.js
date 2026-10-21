@@ -8,9 +8,26 @@
 
 import HttpError from '../lib/httpError.js';
 import { toDateString, toMinutesOfDay } from '../lib/time.js';
-import { insertBooking } from '../repositories/bookings.js';
+import {
+  insertBooking,
+  listUpcomingBookings,
+} from '../repositories/bookings.js';
 import { getEventTypeById } from '../repositories/eventTypes.js';
 import { validateBooking } from '../services/booking.js';
+
+// GET /api/bookings — предстоящие брони владельца, отвечает `200 { bookings }`.
+// Порядок и отбор будущего — в репозитории; «сегодня» и текущее время приходят
+// из инъекции часов приложения.
+export function listBookingsHandler(req, res) {
+  const now = req.app.locals.now();
+
+  res.json({
+    bookings: listUpcomingBookings(req.app.locals.db, {
+      today: toDateString(now),
+      nowMinutes: toMinutesOfDay(now),
+    }),
+  });
+}
 
 // POST /api/bookings — создаёт бронь, отвечает `201 { booking }`.
 export function createBookingHandler(req, res) {
