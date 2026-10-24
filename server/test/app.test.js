@@ -25,6 +25,13 @@ test('приложение отвечает 404 в едином JSON-форма�
   assert.equal(typeof body.error.message, 'string');
 });
 
+test('главная страница отвечает 200 — контейнер проходит автопроверку', async () => {
+  const res = await fetch(`${server.baseUrl}/`);
+
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /application\/json/);
+});
+
 test('битый JSON даёт 400 invalid_json, а не 500', async () => {
   const res = await fetch(`${server.baseUrl}/anything`, {
     method: 'POST',
