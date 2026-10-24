@@ -92,6 +92,33 @@ jobs:
       # сборка это покажет. Путь указывается относительно working-directory.
       - run: git diff --exit-code -- openapi
 
+  # Собирает образ и проверяет, что при запуске контейнера сервер стартует сам
+  # и отвечает на пробу готовности /health (тот же сигнал, что в `npm run smoke`).
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: docker build -t call-calendar .
+
+      - run: docker run -d --name call-calendar -p 3000:3000 call-calendar
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/health | grep -q '"status":"ok"'; then
+              echo "контейнер отвечает на /health"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "не дождались /health, логи контейнера:" >&2
+          docker logs call-calendar >&2
+          exit 1
+
+      - if: always()
+        run: docker rm -f call-calendar
+
   commitlint:
     runs-on: ubuntu-latest
     permissions:
