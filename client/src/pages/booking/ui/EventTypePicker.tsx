@@ -1,6 +1,6 @@
 import type { EventType } from '../../../shared/api'
 import { Badge, Button, Group, Paper, Stack, Text, UnstyledButton } from '@mantine/core'
-import { formatDuration } from '../../../shared/lib'
+import { formatDuration, SLOT_MINUTES } from '../../../shared/lib'
 
 type EventTypePickerProps = {
   eventTypes: EventType[]
@@ -67,7 +67,7 @@ export function EventTypePicker({
                   )}
                 </Stack>
                 <Badge variant="light" color="gray">
-                  {formatDuration(eventType.durationMinutes)}
+                  {formatDuration(SLOT_MINUTES)}
                 </Badge>
               </Group>
             </Paper>

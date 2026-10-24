@@ -5,6 +5,7 @@ import { migrate } from '../src/db/migrate.js';
 
 // Типы событий: POST/GET /api/event-types (docs/spec.md, «Типы событий»).
 // Тесты ходят по HTTP через fetch — тот же путь, что у клиента.
+// Длительности у типа нет: слоты всегда по 30 минут (`SLOT_MINUTES`).
 let server;
 
 before(async () => {
@@ -36,11 +37,10 @@ test('на чистой базе список типов пуст', async () => 
   assert.deepEqual(await res.json(), { eventTypes: [] });
 });
 
-test('создаёт тип события и отвечает 201 телом { eventType }', async () => {
+test('создаёт тип события и отвечает 201 телом { eventType } без длительности', async () => {
   const res = await post({
     name: 'Консультация',
     description: 'Разбор задачи',
-    durationMinutes: 30,
   });
 
   assert.equal(res.status, 201);
@@ -53,28 +53,28 @@ test('создаёт тип события и отвечает 201 телом { 
       id: undefined,
       name: 'Консультация',
       description: 'Разбор задачи',
-      durationMinutes: 30,
     },
   );
+  assert.equal('durationMinutes' in eventType, false);
 });
 
 test('описание необязательно и по умолчанию пустая строка', async () => {
-  const res = await post({ name: 'Без описания', durationMinutes: 15 });
+  const res = await post({ name: 'Без описания' });
 
   assert.equal(res.status, 201);
   assert.equal((await res.json()).eventType.description, '');
 });
 
 test('название сохраняется без окружающих пробелов', async () => {
-  const res = await post({ name: '  Консультация  ', durationMinutes: 30 });
+  const res = await post({ name: '  Консультация  ' });
 
   assert.equal(res.status, 201);
   assert.equal((await res.json()).eventType.name, 'Консультация');
 });
 
 test('список отдаёт типы в порядке возрастания id', async () => {
-  await post({ name: 'Первый', durationMinutes: 30 });
-  await post({ name: 'Второй', durationMinutes: 60 });
+  await post({ name: 'Первый' });
+  await post({ name: 'Второй' });
 
   const res = await fetch(`${server.baseUrl}/api/event-types`);
   const { eventTypes } = await res.json();
@@ -86,31 +86,8 @@ test('список отдаёт типы в порядке возрастани�
   assert.ok(eventTypes[0].id < eventTypes[1].id);
 });
 
-test('принимает границы длительности 1 и 540', async () => {
-  for (const durationMinutes of [1, 540]) {
-    const res = await post({ name: `Тип ${durationMinutes}`, durationMinutes });
-
-    assert.equal(res.status, 201);
-    assert.equal((await res.json()).eventType.durationMinutes, durationMinutes);
-  }
-});
-
-test('отклоняет длительность 0, 541 и нецелую', async () => {
-  for (const durationMinutes of [0, 541, 30.5]) {
-    const res = await post({ name: 'Тип', durationMinutes });
-
-    assert.equal(res.status, 400);
-
-    const body = await res.json();
-    assert.equal(body.error.code, 'validation_error');
-    assert.ok(
-      body.error.details.some((detail) => detail.field === 'durationMinutes'),
-    );
-  }
-});
-
 test('отклоняет пустое после trim название', async () => {
-  const res = await post({ name: '   ', durationMinutes: 30 });
+  const res = await post({ name: '   ' });
 
   assert.equal(res.status, 400);
 
@@ -122,7 +99,7 @@ test('отклоняет пустое после trim название', async (
 });
 
 test('отклоняет название длиннее 100 символов', async () => {
-  const res = await post({ name: 'x'.repeat(101), durationMinutes: 30 });
+  const res = await post({ name: 'x'.repeat(101) });
 
   assert.equal(res.status, 400);
   assert.ok(
@@ -136,7 +113,6 @@ test('отклоняет описание длиннее 1000 символов',
   const res = await post({
     name: 'Тип',
     description: 'x'.repeat(1001),
-    durationMinutes: 30,
   });
 
   assert.equal(res.status, 400);
@@ -155,6 +131,6 @@ test('собирает details по всем невалидным полям р�
   const { details } = (await res.json()).error;
   assert.deepEqual(
     details.map((detail) => detail.field).sort(),
-    ['durationMinutes', 'name'],
+    ['name'],
   );
 });

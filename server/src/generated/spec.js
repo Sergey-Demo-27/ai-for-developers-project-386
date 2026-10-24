@@ -195,8 +195,7 @@ export const schemas = {
     "required": [
       "id",
       "name",
-      "description",
-      "durationMinutes"
+      "description"
     ],
     "properties": {
       "id": {
@@ -213,22 +212,14 @@ export const schemas = {
         "type": "string",
         "maxLength": 1000,
         "description": "Описание, ≤ 1000 символов; по умолчанию пустая строка"
-      },
-      "durationMinutes": {
-        "type": "integer",
-        "format": "int32",
-        "minimum": 1,
-        "maximum": 540,
-        "description": "Длительность в минутах; тип длиннее рабочего дня отклоняется (400)"
       }
     },
-    "description": "Тип события — шаблон, по которому нарезаются слоты. Состав полей — ровно\nчетыре: идентификатор, название, описание, длительность в минутах."
+    "description": "Тип события — шаблон, по которому нарезаются слоты. Состав полей — ровно\nтри: идентификатор, название, описание. Длительность слота — константа\n30 минут (`SLOT_MINUTES`), в типе события не хранится."
   },
   "EventTypeCreate": {
     "type": "object",
     "required": [
-      "name",
-      "durationMinutes"
+      "name"
     ],
     "properties": {
       "name": {
@@ -241,13 +232,6 @@ export const schemas = {
         "maxLength": 1000,
         "description": "Описание, ≤ 1000 символов",
         "default": ""
-      },
-      "durationMinutes": {
-        "type": "integer",
-        "format": "int32",
-        "minimum": 1,
-        "maximum": 540,
-        "description": "Длительность в минутах, целое от 1 до 540"
       }
     },
     "description": "Тело `POST /api/event-types`. Идентификатор генерирует система — в теле его нет."

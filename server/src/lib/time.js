@@ -8,6 +8,10 @@ export const WORKDAY_END_MINUTES = 18 * 60;
 // Окно записи — 14 календарных дней `[сегодня … сегодня + 13]`.
 export const BOOKING_WINDOW_DAYS = 14;
 
+// Длительность слота — константа: слоты по 30 минут (docs/spec.md). И она же —
+// длина интервала брони; отдельного поля длительности у типа события нет.
+export const SLOT_MINUTES = 30;
+
 // Локальная календарная дата (`YYYY-MM-DD`) инстанта.
 export function toDateString(date) {
   const year = date.getFullYear();

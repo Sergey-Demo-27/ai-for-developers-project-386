@@ -8,6 +8,10 @@ const DATE_FORMAT = 'YYYY-MM-DD'
 // Формат времени контракта (`LocalTime`).
 const TIME_FORMAT = 'HH:mm'
 
+// Длительность слота — константа: слоты всегда по 30 минут (та же величина,
+// что `SLOT_MINUTES` на сервере). Тип события длительность больше не задаёт.
+export const SLOT_MINUTES = 30
+
 // Сегодняшняя дата в локальных настенных часах (ADR 0002) — та же, что у сервера.
 export function todayString(now: Date = new Date()): string {
   return dayjs(now).format(DATE_FORMAT)

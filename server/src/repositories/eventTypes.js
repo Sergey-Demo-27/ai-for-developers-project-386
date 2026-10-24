@@ -6,7 +6,7 @@
 /** @typedef {import('../generated/types.js').EventType} EventType */
 
 // Колонки таблицы в порядке контракта — один список на оба запроса.
-const COLUMNS = 'id, name, description, duration_minutes';
+const COLUMNS = 'id, name, description';
 
 // Строка таблицы (snake_case) → тип контракта (camelCase).
 function toEventType(row) {
@@ -14,7 +14,6 @@ function toEventType(row) {
     id: row.id,
     name: row.name,
     description: row.description,
-    durationMinutes: row.duration_minutes,
   };
 }
 
@@ -37,12 +36,10 @@ export function getEventTypeById(db, id) {
 }
 
 // Вставляет тип и возвращает созданную строку. `id` генерирует SQLite.
-export function insertEventType(db, { name, description, durationMinutes }) {
+export function insertEventType(db, { name, description }) {
   const { lastInsertRowid } = db
-    .prepare(
-      'INSERT INTO event_types (name, description, duration_minutes) VALUES (?, ?, ?)',
-    )
-    .run(name, description, durationMinutes);
+    .prepare('INSERT INTO event_types (name, description) VALUES (?, ?)')
+    .run(name, description);
 
   return getEventTypeById(db, lastInsertRowid);
 }

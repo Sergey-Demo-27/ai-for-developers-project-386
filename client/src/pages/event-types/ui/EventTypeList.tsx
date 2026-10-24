@@ -1,7 +1,7 @@
 import type { EventType } from '../../../shared/api'
 import { Paper, Stack, Table, Text } from '@mantine/core'
 
-// Список типов событий: таблица «№ / Название / Описание / Длительность».
+// Список типов событий: таблица «№ / Название / Описание».
 // Порядок — как отдаёт `GET /api/event-types` (по `id`); пустое описание — прочерк.
 export function EventTypeList({ eventTypes }: { eventTypes: EventType[] }) {
   if (eventTypes.length === 0) {
@@ -25,7 +25,6 @@ export function EventTypeList({ eventTypes }: { eventTypes: EventType[] }) {
             <Table.Th w={64}>№</Table.Th>
             <Table.Th>Название</Table.Th>
             <Table.Th>Описание</Table.Th>
-            <Table.Th w={140}>Длительность</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -34,7 +33,6 @@ export function EventTypeList({ eventTypes }: { eventTypes: EventType[] }) {
               <Table.Td>{eventType.id}</Table.Td>
               <Table.Td>{eventType.name}</Table.Td>
               <Table.Td>{eventType.description || '—'}</Table.Td>
-              <Table.Td>{eventType.durationMinutes} мин</Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>

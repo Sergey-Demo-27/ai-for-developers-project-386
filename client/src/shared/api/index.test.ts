@@ -7,7 +7,6 @@ const eventType = {
   id: 1,
   name: 'Консультация',
   description: '',
-  durationMinutes: 30,
 }
 
 function stubFetch(body: unknown, status = 200) {
@@ -50,7 +49,7 @@ describe('сгенерированный SDK', () => {
     const fetchMock = stubFetch({ eventType }, 201)
 
     const { data } = await eventTypesCreate({
-      body: { name: 'Консультация', durationMinutes: 30 },
+      body: { name: 'Консультация' },
     })
 
     expect(data?.eventType).toEqual(eventType)
@@ -60,7 +59,6 @@ describe('сгенерированный SDK', () => {
     expect(new URL(request.url).pathname).toBe('/api/event-types')
     await expect(request.json()).resolves.toEqual({
       name: 'Консультация',
-      durationMinutes: 30,
     })
   })
 

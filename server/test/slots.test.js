@@ -4,7 +4,8 @@ import { startTestServer } from './helpers/app.js';
 import { migrate } from '../src/db/migrate.js';
 
 // Сетка слотов типа события: GET /api/event-types/:id/slots
-// (docs/spec.md, «Сетка слотов и окно записи»).
+// (docs/spec.md, «Сетка слотов и окно записи»). Слоты всегда по 30 минут
+// (`SLOT_MINUTES`), длительности у типа нет.
 //
 // «Сегодня» задаётся инъекцией часов при сборке приложения, поэтому сетка
 // детерминирована: 20 октября 2026, 08:00 — все слоты дня ещё впереди.
@@ -27,11 +28,11 @@ beforeEach(() => {
 });
 
 // Создаёт тип события на приложении и возвращает его `id`.
-async function createEventType(baseUrl, { durationMinutes }) {
+async function createEventType(baseUrl, { name = 'Тип' } = {}) {
   const res = await fetch(`${baseUrl}/api/event-types`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'Тип', durationMinutes }),
+    body: JSON.stringify({ name }),
   });
 
   return (await res.json()).eventType.id;
@@ -44,9 +45,9 @@ async function getSlots(baseUrl, id) {
   return (await res.json()).days;
 }
 
-// Кладёт бронь прямо в таблицу: создание брони появится отдельным тикетом,
-// а занятость нужна уже сейчас — это подготовка данных, а не проверка.
-function insertBooking(db, { eventTypeId, date, startMinutes, durationMinutes }) {
+// Кладёт бронь прямо в таблицу: создание брони живёт в другом тесте, а
+// занятость нужна уже сейчас — это подготовка данных, а не проверка.
+function insertBooking(db, { eventTypeId, date, startMinutes, durationMinutes = 30 }) {
   db.prepare(
     `INSERT INTO bookings
        (event_type_id, date, start_minutes, duration_minutes, guest_name, guest_email)
@@ -73,8 +74,8 @@ async function startAt(now) {
   return instance;
 }
 
-test('для длительности 30 отдаёт 18 слотов в каждом из 14 дней', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+test('отдаёт 18 слотов по 30 минут в каждом из 14 дней', async () => {
+  const id = await createEventType(server.baseUrl);
 
   const days = await getSlots(server.baseUrl, id);
 
@@ -96,7 +97,7 @@ test('для длительности 30 отдаёт 18 слотов в каж�
 });
 
 test('окно — 14 дней [сегодня … сегодня + 13] включительно', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   const days = await getSlots(server.baseUrl, id);
 
@@ -104,32 +105,8 @@ test('окно — 14 дней [сегодня … сегодня + 13] вклю
   assert.equal(days.at(-1).date, '2026-11-02');
 });
 
-test('для длительности 40 — 13 слотов, неполный остаток справа не слот', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 40 });
-
-  const days = await getSlots(server.baseUrl, id);
-
-  assert.equal(days[0].slots.length, 13);
-  assert.deepEqual(days[0].slots.at(-1), {
-    start: '17:00',
-    end: '17:40',
-    available: true,
-  });
-  assert.ok(!days[0].slots.some((slot) => slot.start === '17:40'));
-});
-
-test('для длительности 540 — ровно один слот 09:00–18:00', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 540 });
-
-  const days = await getSlots(server.baseUrl, id);
-
-  assert.deepEqual(days[0].slots, [
-    { start: '09:00', end: '18:00', available: true },
-  ]);
-});
-
 test('на чистой базе все слоты окна свободны', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   const days = await getSlots(server.baseUrl, id);
   const allSlots = days.flatMap((day) => day.slots);
@@ -139,14 +116,11 @@ test('на чистой базе все слоты окна свободны', a
 });
 
 test('слот, пересекающийся с бронью, недоступен и остаётся в сетке', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
-  const otherId = await createEventType(server.baseUrl, {
-    durationMinutes: 60,
-  });
+  const id = await createEventType(server.baseUrl);
 
-  // Бронь другого типа 09:00–10:00 на завтра: занятость сквозная по типам.
+  // Бронь 09:00–10:00 (60 минут) на завтра пересекает два 30-минутных слота.
   insertBooking(server.db, {
-    eventTypeId: otherId,
+    eventTypeId: id,
     date: '2026-10-21',
     startMinutes: 9 * 60,
     durationMinutes: 60,
@@ -163,14 +137,13 @@ test('слот, пересекающийся с бронью, недоступе
 });
 
 test('касание интервалов занятостью не считается', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   // Бронь 09:00–09:30: следующий слот 09:30–10:00 только касается её.
   insertBooking(server.db, {
     eventTypeId: id,
     date: '2026-10-21',
     startMinutes: 9 * 60,
-    durationMinutes: 30,
   });
 
   const days = await getSlots(server.baseUrl, id);
@@ -181,13 +154,12 @@ test('касание интервалов занятостью не считае
 });
 
 test('бронь в другой день не влияет на доступность', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   insertBooking(server.db, {
     eventTypeId: id,
     date: '2026-10-21',
     startMinutes: 9 * 60,
-    durationMinutes: 30,
   });
 
   const days = await getSlots(server.baseUrl, id);
@@ -200,7 +172,7 @@ test('прошедшие слоты сегодня недоступны, но о
   const midday = await startAt(new Date(2026, 9, 20, 12, 0));
 
   try {
-    const id = await createEventType(midday.baseUrl, { durationMinutes: 30 });
+    const id = await createEventType(midday.baseUrl);
     const days = await getSlots(midday.baseUrl, id);
     const today = days[0];
 
@@ -224,7 +196,7 @@ test('нецелый id даёт 404 event_type_not_found', async () => {
 });
 
 test('id в нецелевидной записи («1.0», «1e0») даёт 404, а не 200', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   for (const raw of [`${id}.0`, `${id}e0`, `0x${id.toString(16)}`]) {
     const res = await fetch(`${server.baseUrl}/api/event-types/${raw}/slots`);

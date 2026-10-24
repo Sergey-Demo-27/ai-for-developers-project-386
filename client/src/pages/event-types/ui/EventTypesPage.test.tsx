@@ -14,7 +14,6 @@ const consultation = {
   id: 1,
   name: 'Консультация',
   description: '',
-  durationMinutes: 30,
 }
 
 describe('EventTypesPage', () => {
@@ -92,7 +91,6 @@ describe('EventTypesPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Создать' }))
 
     expect(await screen.findByText('Консультация')).toBeInTheDocument()
-    expect(screen.getByText('30 мин')).toBeInTheDocument()
     expect(screen.getByLabelText(/Название/)).toHaveValue('')
   })
 

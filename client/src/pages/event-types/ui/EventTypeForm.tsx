@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Alert,
   Button,
-  NumberInput,
   Paper,
   Stack,
   Textarea,
@@ -16,18 +15,17 @@ import { ApiError, errorMessage, eventTypesCreate, unwrap } from '../../../share
 type EventTypeFormValues = {
   name: string
   description: string
-  durationMinutes: number | string
 }
 
 const INITIAL_VALUES: EventTypeFormValues = {
   name: '',
   description: '',
-  durationMinutes: 30,
 }
 
 // Форма создания типа события. Идентификатор генерирует система — поля для
-// него нет. Клиентские правила совпадают с серверными (#8); `400 validation_error`
-// дополнительно раскладывается по полям из `details`.
+// него нет; длительности у типа тоже нет: слоты всегда по 30 минут (константа
+// `SLOT_MINUTES`). Клиентские правила совпадают с серверными (#8);
+// `400 validation_error` дополнительно раскладывается по полям из `details`.
 export function EventTypeForm({ onCreated }: { onCreated: () => void }) {
   const [banner, setBanner] = useState<string | null>(null)
 
@@ -41,13 +39,6 @@ export function EventTypeForm({ onCreated }: { onCreated: () => void }) {
       },
       description: (value) =>
         value.length > 1000 ? 'Не более 1000 символов' : null,
-      durationMinutes: (value) => {
-        const minutes = typeof value === 'number' ? value : Number(value)
-        if (!Number.isInteger(minutes) || minutes < 1 || minutes > 540) {
-          return 'Длительность должна быть целым числом от 1 до 540'
-        }
-        return null
-      },
     },
   })
 
@@ -60,7 +51,6 @@ export function EventTypeForm({ onCreated }: { onCreated: () => void }) {
           body: {
             name: values.name.trim(),
             description: values.description,
-            durationMinutes: Number(values.durationMinutes),
           },
           throwOnError: true,
         }),
@@ -118,16 +108,6 @@ export function EventTypeForm({ onCreated }: { onCreated: () => void }) {
             placeholder="О чём встреча (необязательно)"
             minRows={2}
             {...form.getInputProps('description')}
-          />
-
-          <NumberInput
-            label="Длительность"
-            suffix=" мин"
-            min={1}
-            max={540}
-            allowDecimal={false}
-            w={200}
-            {...form.getInputProps('durationMinutes')}
           />
 
           <Button

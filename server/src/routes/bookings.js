@@ -7,7 +7,7 @@
 // — они собраны в `services/booking.js` и репозитории.
 
 import HttpError from '../lib/httpError.js';
-import { toDateString, toMinutesOfDay } from '../lib/time.js';
+import { SLOT_MINUTES, toDateString, toMinutesOfDay } from '../lib/time.js';
 import {
   insertBooking,
   listUpcomingBookings,
@@ -44,7 +44,6 @@ export function createBookingHandler(req, res) {
   const now = req.app.locals.now();
 
   const { details, startMinutes } = validateBooking({
-    eventType,
     date,
     start,
     guestName,
@@ -64,7 +63,7 @@ export function createBookingHandler(req, res) {
     eventTypeId,
     date,
     startMinutes,
-    durationMinutes: eventType.durationMinutes,
+    durationMinutes: SLOT_MINUTES,
     guestName: guestName.trim(),
     guestEmail,
   });

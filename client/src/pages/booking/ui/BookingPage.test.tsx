@@ -40,14 +40,12 @@ const consultation = {
   id: 1,
   name: 'Консультация',
   description: 'Разговор на 30 минут',
-  durationMinutes: 30,
 }
 
 const meeting = {
   id: 2,
   name: 'Созвон',
   description: '',
-  durationMinutes: 60,
 }
 
 function slot(start: string, end: string, available: boolean) {

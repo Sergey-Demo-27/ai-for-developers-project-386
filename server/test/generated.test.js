@@ -47,7 +47,8 @@ test('маршрут из контракта валидирует тело до 
 
   const body = await res.json();
   assert.equal(body.error.code, 'validation_error');
-  assert.equal(body.error.details.length, 2);
+  assert.equal(body.error.details.length, 1);
+  assert.equal(body.error.details[0].field, 'name');
 });
 
 test('неизвестный путь под /api остаётся 404 not_found', async () => {

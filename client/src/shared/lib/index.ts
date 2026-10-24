@@ -7,5 +7,6 @@ export {
   formatDuration,
   formatSlotRange,
   minutesBetween,
+  SLOT_MINUTES,
   todayString,
 } from './date'

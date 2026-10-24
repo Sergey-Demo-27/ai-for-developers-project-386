@@ -9,7 +9,7 @@ import { migrate } from '../src/db/migrate.js';
 //
 // Часы подставляются инъекцией и меняются по ходу сценария: брони создаются
 // «утром», а список читается позже — так проверяется отбор будущего без
-// ручных вставок в таблицу.
+// ручных вставок в таблицу. Слоты всегда по 30 минут (`SLOT_MINUTES`).
 const MORNING = new Date(2026, 9, 20, 8, 0); // 20 октября 2026, 08:00
 const MIDDAY = new Date(2026, 9, 20, 12, 0); // 20 октября 2026, 12:00
 
@@ -31,11 +31,11 @@ beforeEach(() => {
 });
 
 // Создаёт тип события и возвращает его `id`.
-async function createEventType(baseUrl, { name = 'Тип', durationMinutes }) {
+async function createEventType(baseUrl, { name = 'Тип' } = {}) {
   const res = await fetch(`${baseUrl}/api/event-types`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, durationMinutes }),
+    body: JSON.stringify({ name }),
   });
 
   return (await res.json()).eventType.id;
@@ -67,36 +67,32 @@ function listBookings(baseUrl) {
   return fetch(`${baseUrl}/api/bookings`);
 }
 
-test('отдаёт только будущие брони, по возрастанию даты и времени, с именем типа и снимком интервала', async () => {
-  const halfHour = await createEventType(server.baseUrl, {
+test('отдаёт только будущие брони, по возрастанию даты и времени, с именем типа и интервалом 30 минут', async () => {
+  const consultation = await createEventType(server.baseUrl, {
     name: 'Консультация',
-    durationMinutes: 30,
   });
-  const hour = await createEventType(server.baseUrl, {
-    name: 'Созвон',
-    durationMinutes: 60,
-  });
+  const meeting = await createEventType(server.baseUrl, { name: 'Созвон' });
 
   // Бронь сегодня в 09:00 к полудню уже началась — в список не попадает.
   const started = await book(server.baseUrl, {
-    eventTypeId: halfHour,
+    eventTypeId: consultation,
     date: '2026-10-20',
     start: '09:00',
     guestName: 'Прошедший',
     guestEmail: 'past@example.com',
   });
   const todayLater = await book(server.baseUrl, {
-    eventTypeId: halfHour,
+    eventTypeId: consultation,
     date: '2026-10-20',
     start: '12:30',
   });
   const tomorrowEarly = await book(server.baseUrl, {
-    eventTypeId: hour,
+    eventTypeId: meeting,
     date: '2026-10-21',
     start: '09:00',
   });
   const tomorrowLate = await book(server.baseUrl, {
-    eventTypeId: hour,
+    eventTypeId: meeting,
     date: '2026-10-21',
     start: '10:00',
   });
@@ -119,7 +115,7 @@ test('отдаёт только будущие брони, по возраста
   );
 
   const [first] = bookings;
-  assert.equal(first.end, '13:00', 'конец — из снимка длительности брони');
+  assert.equal(first.end, '13:00', 'конец — начало плюс 30 минут');
   assert.equal(
     first.eventTypeName,
     'Консультация',
@@ -139,18 +135,16 @@ test('отдаёт только будущие брони, по возраста
 });
 
 test('бронь сегодняшнего дня включается, только если начало строго в будущем', async () => {
-  const halfHour = await createEventType(server.baseUrl, {
-    durationMinutes: 30,
-  });
+  const id = await createEventType(server.baseUrl);
 
   // К полудню 12:00 уже идёт, 12:30 ещё не начался.
   await book(server.baseUrl, {
-    eventTypeId: halfHour,
+    eventTypeId: id,
     date: '2026-10-20',
     start: '12:00',
   });
   const later = await book(server.baseUrl, {
-    eventTypeId: halfHour,
+    eventTypeId: id,
     date: '2026-10-20',
     start: '12:30',
   });
@@ -166,12 +160,10 @@ test('бронь сегодняшнего дня включается, толь�
 });
 
 test('бронь с прошедшей датой в список не попадает', async () => {
-  const halfHour = await createEventType(server.baseUrl, {
-    durationMinutes: 30,
-  });
+  const id = await createEventType(server.baseUrl);
 
   await book(server.baseUrl, {
-    eventTypeId: halfHour,
+    eventTypeId: id,
     date: '2026-10-21',
     start: '09:00',
   });

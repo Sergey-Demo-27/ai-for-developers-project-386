@@ -21,7 +21,6 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * полям разом (не «первое по очереди») и разобранное начало слота.
  *
  * @param {object} input
- * @param {{durationMinutes: number}} input.eventType существующий тип события
  * @param {string} input.date дата `YYYY-MM-DD`
  * @param {string} input.start начало слота `HH:MM`
  * @param {string} input.guestName имя гостя
@@ -31,7 +30,6 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * @returns {{details: Array<{field: string, message: string}>, startMinutes: number}}
  */
 export function validateBooking({
-  eventType,
   date,
   start,
   guestName,
@@ -40,7 +38,6 @@ export function validateBooking({
   nowMinutes,
 }) {
   const details = [];
-  const durationMinutes = eventType.durationMinutes;
   const startMinutes = parseTimeToMinutes(start);
 
   const lastDate = addDays(today, BOOKING_WINDOW_DAYS - 1);
@@ -50,7 +47,7 @@ export function validateBooking({
 
   // Слот существует, только если его начало лежит на сетке типа
   // (`services/slots.js` — единственное определение реального слота).
-  if (!slotStarts(durationMinutes).includes(startMinutes)) {
+  if (!slotStarts().includes(startMinutes)) {
     details.push({
       field: 'start',
       message: 'Время не совпадает со слотом типа события',

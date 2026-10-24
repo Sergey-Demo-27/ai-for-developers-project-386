@@ -40,7 +40,6 @@ export function listSlotsHandler(req, res) {
 
   res.json({
     days: buildSlotGrid({
-      durationMinutes: eventType.durationMinutes,
       today,
       nowMinutes: toMinutesOfDay(now),
       bookings,

@@ -7,7 +7,8 @@ import { migrate } from '../src/db/migrate.js';
 // (docs/spec.md, «Правило занятости», «HTTP-контракты и ошибки»).
 //
 // Тесты ходят по HTTP через fetch — тот же путь, что у клиента; «сегодня»
-// задаётся инъекцией часов, поэтому окно записи детерминировано.
+// задаётся инъекцией часов, поэтому окно записи детерминировано. Слоты всегда
+// по 30 минут (`SLOT_MINUTES`), длительности у типа события нет.
 const NOW = new Date(2026, 9, 20, 8, 0); // 20 октября 2026, 08:00
 
 let server;
@@ -27,14 +28,34 @@ beforeEach(() => {
 });
 
 // Создаёт тип события и возвращает его `id`.
-async function createEventType(baseUrl, { durationMinutes }) {
+async function createEventType(baseUrl, { name = 'Тип' } = {}) {
   const res = await fetch(`${baseUrl}/api/event-types`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'Тип', durationMinutes }),
+    body: JSON.stringify({ name }),
   });
 
   return (await res.json()).eventType.id;
+}
+
+// Кладёт бронь прямо в таблицу — для проверок пересечения с нестандартной
+// длиной (обычные брони всегда 30 минут).
+function insertBookingDirect(
+  db,
+  { eventTypeId, date, startMinutes, durationMinutes },
+) {
+  db.prepare(
+    `INSERT INTO bookings
+       (event_type_id, date, start_minutes, duration_minutes, guest_name, guest_email)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    eventTypeId,
+    date,
+    startMinutes,
+    durationMinutes,
+    'Иван',
+    'ivan@example.com',
+  );
 }
 
 // POST /api/bookings с телом как есть.
@@ -58,8 +79,8 @@ function slotAt(day, start) {
   return day.slots.find((slot) => slot.start === start);
 }
 
-test('создаёт бронь и отвечает 201 телом { booking } со снимком длительности', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+test('создаёт бронь и отвечает 201 телом { booking } с интервалом 09:00–09:30', async () => {
+  const id = await createEventType(server.baseUrl, { name: 'Консультация' });
 
   const res = await postBooking(server.baseUrl, {
     eventTypeId: id,
@@ -82,23 +103,23 @@ test('создаёт бронь и отвечает 201 телом { booking } �
   assert.match(booking.createdAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
 });
 
-test('конец брони — начало плюс длительность типа', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 60 });
+test('конец брони — начало плюс 30 минут', async () => {
+  const id = await createEventType(server.baseUrl);
 
   const res = await postBooking(server.baseUrl, {
     eventTypeId: id,
     date: '2026-10-21',
-    start: '09:00',
+    start: '14:30',
     guestName: 'Иван',
     guestEmail: 'ivan@example.com',
   });
 
   assert.equal(res.status, 201);
-  assert.equal((await res.json()).booking.end, '10:00');
+  assert.equal((await res.json()).booking.end, '15:00');
 });
 
 test('имя гостя сохраняется без окружающих пробелов', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   const res = await postBooking(server.baseUrl, {
     eventTypeId: id,
@@ -113,8 +134,8 @@ test('имя гостя сохраняется без окружающих пр�
 });
 
 test('после брони слот занят в сетке своего и любого другого типа', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
-  const otherId = await createEventType(server.baseUrl, { durationMinutes: 60 });
+  const id = await createEventType(server.baseUrl, { name: 'Консультация' });
+  const otherId = await createEventType(server.baseUrl, { name: 'Созвон' });
 
   const res = await postBooking(server.baseUrl, {
     eventTypeId: id,
@@ -130,11 +151,11 @@ test('после брони слот занят в сетке своего и л
 
   assert.equal(slotAt(own[1], '09:00').available, false);
   assert.equal(slotAt(other[1], '09:00').available, false);
-  assert.equal(slotAt(other[1], '10:00').available, true);
+  assert.equal(slotAt(other[1], '09:30').available, true);
 });
 
 test('повторная бронь того же слота даёт 409 slot_taken', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
   const body = {
     eventTypeId: id,
     date: '2026-10-21',
@@ -154,19 +175,16 @@ test('повторная бронь того же слота даёт 409 slot_t
   assert.equal(error.message, 'Это время уже занято, выберите другой слот');
 });
 
-test('частичное наложение разных типов даёт 409', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
-  const otherId = await createEventType(server.baseUrl, { durationMinutes: 60 });
+test('бронь поверх частично перекрывающего интервала даёт 409', async () => {
+  const id = await createEventType(server.baseUrl);
 
-  // Занято 09:00–10:00 типом на час; слот 09:30–10:00 пересекается с ним.
-  const first = await postBooking(server.baseUrl, {
-    eventTypeId: otherId,
+  // Занято 09:00–10:00 (60 минут); слот 09:30–10:00 пересекается с ним.
+  insertBookingDirect(server.db, {
+    eventTypeId: id,
     date: '2026-10-21',
-    start: '09:00',
-    guestName: 'Иван',
-    guestEmail: 'ivan@example.com',
+    startMinutes: 9 * 60,
+    durationMinutes: 60,
   });
-  assert.equal(first.status, 201);
 
   const res = await postBooking(server.baseUrl, {
     eventTypeId: id,
@@ -181,12 +199,11 @@ test('частичное наложение разных типов даёт 409
 });
 
 test('касание интервалов конфликтом не считается', async () => {
-  const halfHour = await createEventType(server.baseUrl, { durationMinutes: 30 });
-  const hour = await createEventType(server.baseUrl, { durationMinutes: 60 });
+  const id = await createEventType(server.baseUrl);
 
-  // 09:00–10:00 и 10:00–10:30 только касаются в точке 10:00.
+  // 09:00–09:30 и 09:30–10:00 только касаются в точке 09:30.
   const first = await postBooking(server.baseUrl, {
-    eventTypeId: hour,
+    eventTypeId: id,
     date: '2026-10-21',
     start: '09:00',
     guestName: 'Иван',
@@ -195,9 +212,9 @@ test('касание интервалов конфликтом не считае
   assert.equal(first.status, 201);
 
   const second = await postBooking(server.baseUrl, {
-    eventTypeId: halfHour,
+    eventTypeId: id,
     date: '2026-10-21',
-    start: '10:00',
+    start: '09:30',
     guestName: 'Пётр',
     guestEmail: 'petr@example.com',
   });
@@ -206,7 +223,7 @@ test('касание интервалов конфликтом не считае
 });
 
 test('бронь в другой день не мешает тому же слоту', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
   const body = {
     eventTypeId: id,
     start: '09:00',
@@ -249,7 +266,7 @@ function bookingBody(eventTypeId, overrides = {}) {
 }
 
 test('границы окна записи: сегодня и сегодня + 13 приняты', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   const first = await postBooking(server.baseUrl, bookingBody(id, { date: '2026-10-20' }));
   const last = await postBooking(server.baseUrl, bookingBody(id, { date: '2026-11-02' }));
@@ -259,7 +276,7 @@ test('границы окна записи: сегодня и сегодня + 1
 });
 
 test('дата вне окна записи даёт 400 по полю date', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   for (const date of ['2026-10-19', '2026-11-03']) {
     const res = await postBooking(server.baseUrl, bookingBody(id, { date }));
@@ -276,7 +293,7 @@ test('слот сегодняшнего дня с прошедшим начал�
   const midday = await startAt(new Date(2026, 9, 20, 12, 0));
 
   try {
-    const id = await createEventType(midday.baseUrl, { durationMinutes: 30 });
+    const id = await createEventType(midday.baseUrl);
 
     // 11:30 уже прошло, 12:00 идёт прямо сейчас — оба недоступны.
     for (const start of ['11:30', '12:00']) {
@@ -300,22 +317,17 @@ test('слот сегодняшнего дня с прошедшим начал�
   }
 });
 
-test('время вне сетки типа даёт 400 по полю start', async () => {
-  const halfHour = await createEventType(server.baseUrl, { durationMinutes: 30 });
-  const forty = await createEventType(server.baseUrl, { durationMinutes: 40 });
+test('время вне сетки слотов даёт 400 по полю start', async () => {
+  const id = await createEventType(server.baseUrl);
 
-  // 09:15 — между слотами 30-минутного типа; 08:30 — до начала рабочего дня.
-  for (const start of ['09:15', '08:30']) {
-    const res = await postBooking(server.baseUrl, bookingBody(halfHour, { start }));
+  // 09:15 — между слотами; 08:30 — до начала рабочего дня; 17:40 — после
+  // последнего слота 17:30–18:00.
+  for (const start of ['09:15', '08:30', '17:40']) {
+    const res = await postBooking(server.baseUrl, bookingBody(id, { start }));
 
     assert.equal(res.status, 400, `ожидали 400 для старта «${start}»`);
     assert.deepEqual(fields(await res.json()), ['start']);
   }
-
-  // 17:40 — неполный остаток справа у 40-минутного типа: не слот.
-  const res = await postBooking(server.baseUrl, bookingBody(forty, { start: '17:40' }));
-  assert.equal(res.status, 400);
-  assert.deepEqual(fields(await res.json()), ['start']);
 });
 
 test('несуществующий тип события даёт 404 event_type_not_found', async () => {
@@ -326,10 +338,9 @@ test('несуществующий тип события даёт 404 event_type
 });
 
 test('нецелый eventTypeId отклоняет схема контракта, а не обработчик', async () => {
-  // Тикет #22 формулирует «нецелый eventTypeId → 404» по аналогии с путём
-  // `:id` слотов, но в контракте `eventTypeId` — integer: нецелое значение
-  // ловит схема (`BookingCreate`) и отдаёт `400 validation_error`, до
-  // обработчика оно не доходит. Существование типа — уже смысловое правило.
+  // В контракте `eventTypeId` — integer: нецелое значение ловит схема
+  // (`BookingCreate`) и отдаёт `400 validation_error`, до обработчика оно не
+  // доходит. Существование типа — уже смысловое правило.
   const res = await postBooking(server.baseUrl, bookingBody('1'));
 
   assert.equal(res.status, 400);
@@ -337,7 +348,7 @@ test('нецелый eventTypeId отклоняет схема контракт�
 });
 
 test('пустое после trim имя гостя даёт 400 по полю guestName', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   const res = await postBooking(server.baseUrl, bookingBody(id, { guestName: '   ' }));
 
@@ -346,7 +357,7 @@ test('пустое после trim имя гостя даёт 400 по полю 
 });
 
 test('email неверного формата даёт 400 по полю guestEmail', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   for (const guestEmail of ['not-an-email', 'ivan@example', 'ivan example.com']) {
     const res = await postBooking(server.baseUrl, bookingBody(id, { guestEmail }));
@@ -357,7 +368,7 @@ test('email неверного формата даёт 400 по полю guestEm
 });
 
 test('details собирается по всем невалидным полям разом', async () => {
-  const id = await createEventType(server.baseUrl, { durationMinutes: 30 });
+  const id = await createEventType(server.baseUrl);
 
   const res = await postBooking(
     server.baseUrl,

@@ -4,22 +4,19 @@
 -- (`CREATE TABLE IF NOT EXISTS`), повторный запуск безопасен.
 
 -- Типы событий — шаблоны, по которым нарезаются слоты (docs/spec.md).
--- Состав полей — ровно четыре: идентификатор, название, описание,
--- длительность в минутах. `id` генерирует система; длительность ограничена
--- рабочим днём, иначе тип не порождает ни одного слота.
+-- Состав полей — ровно три: идентификатор, название, описание. Длительность
+-- слота — константа 30 минут (`SLOT_MINUTES`), отдельного поля у типа нет.
 CREATE TABLE IF NOT EXISTS event_types (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   name             TEXT    NOT NULL,
-  description      TEXT    NOT NULL DEFAULT '',
-  duration_minutes INTEGER NOT NULL
-                   CHECK (duration_minutes > 0 AND duration_minutes <= 540)
+  description      TEXT    NOT NULL DEFAULT ''
 );
 
 -- Брони — записи гостей на конкретный слот. Время хранится как локальное
 -- настенное (ADR 0002): `date` (`YYYY-MM-DD`) + `start_minutes` (минуты от
--- полуночи) + снимок `duration_minutes` на момент брони. Занятость считается
--- по этой таблице и сквозная по типам; отдельной таблицы или индекса
--- занятости нет — пересечение интервалов `UNIQUE` не выражает.
+-- полуночи) + длина слота `duration_minutes` (константа `SLOT_MINUTES`).
+-- Занятость считается по этой таблице и сквозная по типам; отдельной таблицы
+-- или индекса занятости нет — пересечение интервалов `UNIQUE` не выражает.
 CREATE TABLE IF NOT EXISTS bookings (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   event_type_id    INTEGER NOT NULL REFERENCES event_types(id),

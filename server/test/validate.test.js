@@ -22,7 +22,6 @@ function fields(error) {
 test('валидатор пропускает корректное тело и подставляет default из контракта', () => {
   const { req, error } = run('EventTypeCreate', {
     name: 'Консультация',
-    durationMinutes: 30,
   });
 
   assert.equal(error, undefined);
@@ -34,16 +33,15 @@ test('валидатор собирает details по всем невалидн
 
   assert.equal(error.status, 400);
   assert.equal(error.code, 'validation_error');
-  assert.deepEqual(fields(error), ['durationMinutes', 'name']);
+  assert.deepEqual(fields(error), ['name']);
 });
 
-test('валидатор ловит границы длительности', () => {
+test('валидатор ловит слишком длинное название', () => {
   const { error } = run('EventTypeCreate', {
-    name: 'Слишком длинная',
-    durationMinutes: 541,
+    name: 'x'.repeat(101),
   });
 
-  assert.deepEqual(fields(error), ['durationMinutes']);
+  assert.deepEqual(fields(error), ['name']);
 });
 
 test('валидатор ловит формат даты и времени в брони', () => {

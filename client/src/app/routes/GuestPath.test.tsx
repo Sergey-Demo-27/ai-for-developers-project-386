@@ -23,7 +23,6 @@ const consultation = {
   id: 1,
   name: 'Консультация',
   description: 'Разговор на 30 минут',
-  durationMinutes: 30,
 }
 
 function slot(start: string, end: string, available: boolean) {

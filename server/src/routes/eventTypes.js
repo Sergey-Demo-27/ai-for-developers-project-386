@@ -15,7 +15,7 @@ export function listEventTypesHandler(req, res) {
 
 // POST /api/event-types — создаёт тип события, отвечает `201 { eventType }`.
 export function createEventTypeHandler(req, res) {
-  const { name, description, durationMinutes } = req.body;
+  const { name, description } = req.body;
 
   // Схема допускает строку из пробелов; «непустое после trim» — смысловое правило.
   const trimmedName = name.trim();
@@ -29,7 +29,6 @@ export function createEventTypeHandler(req, res) {
   const eventType = insertEventType(req.app.locals.db, {
     name: trimmedName,
     description,
-    durationMinutes,
   });
 
   res.status(201).json({ eventType });

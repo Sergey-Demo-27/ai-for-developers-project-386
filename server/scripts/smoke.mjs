@@ -111,14 +111,17 @@ async function waitForHealth() {
 async function runContract() {
   const created = await postJson('/api/event-types', {
     name: 'Дымовой тип',
-    durationMinutes: 30,
   });
   assert.equal(created.status, 201, 'POST /api/event-types → 201');
   const eventType = created.body.eventType;
   assert.ok(eventType, 'ответ содержит { eventType }');
   assert.equal(typeof eventType.id, 'number', 'eventType.id — число');
   assert.equal(eventType.name, 'Дымовой тип', 'имя сохранено');
-  assert.equal(eventType.durationMinutes, 30, 'длительность сохранена');
+  assert.equal(
+    'durationMinutes' in eventType,
+    false,
+    'у типа события нет длительности — слоты всегда по 30 минут',
+  );
 
   const slots = await getJson(`/api/event-types/${eventType.id}/slots`);
   assert.equal(slots.status, 200, 'GET /api/event-types/:id/slots → 200');
@@ -142,7 +145,7 @@ async function runContract() {
   assert.equal(booking.eventTypeId, eventType.id, 'бронь ссылается на тип');
   assert.equal(booking.date, free.date, 'дата брони — дата слота');
   assert.equal(booking.start, free.start, 'начало брони — начало слота');
-  assert.equal(booking.end, free.end, 'end вычислен из длительности');
+  assert.equal(booking.end, free.end, 'end вычислен из начала и 30 минут');
   assert.equal(booking.guestName, 'Дымовой гость', 'имя гостя сохранено');
   assert.equal(booking.guestEmail, 'smoke@example.com', 'email сохранён');
   assert.ok(booking.createdAt, 'booking.createdAt присутствует');

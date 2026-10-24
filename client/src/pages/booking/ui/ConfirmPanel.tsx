@@ -4,7 +4,7 @@ import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
 import { ApiError, bookingsCreate, errorMessage, unwrap } from '../../../shared/api'
 import type { EventType, Slot } from '../../../shared/api'
-import { formatDayLabel, formatDuration, formatSlotRange } from '../../../shared/lib'
+import { formatDayLabel, formatDuration, formatSlotRange, SLOT_MINUTES } from '../../../shared/lib'
 
 type ConfirmPanelProps = {
   eventType: EventType
@@ -62,7 +62,7 @@ export function ConfirmPanel({
 
   const summary = [
     eventType.name,
-    formatDuration(eventType.durationMinutes),
+    formatDuration(SLOT_MINUTES),
     formatDayLabel(date),
     formatSlotRange(slot.start, slot.end),
   ].join(' · ')

@@ -1,6 +1,6 @@
 import { Paper, SimpleGrid, Stack, Text } from '@mantine/core'
 import type { EventType, Slot } from '../../../shared/api'
-import { formatDayLabel, formatDuration, formatSlotRange } from '../../../shared/lib'
+import { formatDayLabel, formatDuration, formatSlotRange, SLOT_MINUTES } from '../../../shared/lib'
 
 type InfoPanelProps = {
   eventType: EventType | null
@@ -45,7 +45,7 @@ export function InfoPanel({
           label="Длительности в дне"
           value={
             selectedDate && eventType
-              ? formatDuration(eventType.durationMinutes)
+              ? formatDuration(SLOT_MINUTES)
               : 'Нет слотов на этот день'
           }
         />
