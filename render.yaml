@@ -1,6 +1,6 @@
 # Blueprint Render: два сервиса из одного репозитория.
 #
-# Бэкенд (server/) — Node Web Service; фронтенд (client/) — Static Site.
+# Бэкенд (server/) — Docker Web Service; фронтенд (client/) — Static Site.
 # Контракт (api/) не деплоится: openapi.yaml и оба generated/ закоммичены,
 # генерацию на Render запускать не нужно.
 #
@@ -12,26 +12,22 @@
 services:
   - type: web
     name: call-calendar-api
-    runtime: node
+    runtime: docker
     plan: free
-    rootDir: server
-    # devDeps (oxlint, yaml) в рантайме не нужны — только ajv и express
-    # из dependencies. Отдельного шага сборки нет: артефакты закоммичены.
-    buildCommand: npm ci --omit=dev
-    # Схема идемпотентна (CREATE TABLE IF NOT EXISTS), поэтому применяется
-    # на каждом старте до запуска сервера — как в CMD корневого Dockerfile.
-    startCommand: npm run migrate && npm start
+    # Dockerfile и контекст сборки — в корне репозитория (как в CI и в
+    # `docker build .`). Отдельного buildCommand нет: образ собирает Render.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Тот же /health, что использует HEALTHCHECK образа, `npm run smoke` и CI.
     healthCheckPath: /health
+    # PORT не задаём: Render инжектит его контейнеру сам, а config.js читает
+    # process.env.PORT. DB_PATH совпадает с WORKDIR /app в Dockerfile, а каталог
+    # /app/data создаётся при сборке образа.
     envVars:
       - key: NODE_ENV
         value: production
-      # node:sqlite требует Node 24; Render по умолчанию уже даёт 24.x,
-      # но фиксируем явно, чтобы версия не «поехала» с обновлением платформы.
-      - key: NODE_VERSION
-        value: "24"
-      # PORT не задаём: Render инжектит его сам, config.js читает process.env.PORT.
       - key: DB_PATH
-        value: ./data/prod.db
+        value: /app/data/prod.db
 
   - type: web
     name: call-calendar-client
@@ -39,20 +35,32 @@ services:
     rootDir: client
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
-    # Запросы клиента к /api/... уходят на бэкенд тем же origin через rewrite
-    # (серверный прокси), поэтому CORS не нужен — как и в dev-прокси Vite.
-    # destination следует за именем сервиса выше; при смене имени обновите URL.
+    # У клиента нет своего .nvmrc (он в корне), а Vite 8 требует свежий Node —
+    # фиксируем версию явно, чтобы она не «поехала» с обновлением платформы.
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
     routes:
+      # Клиент ходит в API на /api/... того же origin (см.
+      # client/src/shared/api/client.ts), поэтому запросы проксируются на
+      # бэкенд через rewrite — CORS не нужен, как и в dev-прокси Vite.
+      # destination — адрес реально работающего бэкенда. При полном применении
+      # этого blueprint замените его на https://call-calendar-api.onrender.com/api/*.
       - type: rewrite
         source: /api/*
-        destination: https://call-calendar-api.onrender.com/api/*
+        destination: https://ai-for-developers-project-386-tpsk.onrender.com/api/*
+      # SPA-fallback: любой неизвестный путь отдаёт index.html, а маршрутизацию
+      # дальше берёт на себя react-router (/booking, /bookings, /event-types).
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
 # Чтобы данные SQLite переживали деплои, бэкенд нужно перевести на plan: starter
-# и добавить в его блок:
+# и добавить в его блок том:
 #
 #     disk:
 #       name: call-calendar-data
-#       mountPath: /opt/render/project/src/storage
+#       mountPath: /app/data
 #       sizeGB: 1
 #
-# и заменить DB_PATH на /opt/render/project/src/storage/prod.db.
+# DB_PATH при этом уже указывает на /app/data/prod.db.
