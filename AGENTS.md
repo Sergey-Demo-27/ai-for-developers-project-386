@@ -107,3 +107,9 @@ The five canonical triage roles, each label string equal to its name. See `docs/
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### MCP servers
+
+Конфигурация MCP-серверов лежит в [`opencode.json`](./opencode.json) в корне
+репозитория. Render MCP берёт ключ из переменной окружения `RENDER_API_KEY` —
+самого секрета в репозитории нет.
