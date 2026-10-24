@@ -67,6 +67,8 @@
 │   ├── openapi/     # openapi.yaml — генерируется, руками не правится
 │   ├── tspconfig.yaml
 │   └── package.json
+├── Dockerfile       # образ бэкенда: при запуске сервер стартует сам
+├── .dockerignore
 └── README.md
 ```
 
@@ -132,11 +134,12 @@ npm run coverage
 поднимает реальный сервер и ждёт ответа этого эндпоинта.
 
 В CI (`.github/workflows/ci.yml`) на каждый push и pull request запускаются
-четыре job-а: `server` (`npm ci` → `lint` → проверка, что серверные артефакты
+пять job-ов: `server` (`npm ci` → `lint` → проверка, что серверные артефакты
 не устарели → `test` → `migrate` → `smoke`),
 `client` (`npm ci` → `lint` → `test` → `build` → проверка, что клиентский SDK
 не устарел), `api` (`npm ci` → `lint` → `build` → проверка, что `openapi.yaml`
-не устарел) и `commitlint` (проверка сообщений коммитов).
+не устарел), `docker` (`docker build` → запуск контейнера → ожидание `/health`)
+и `commitlint` (проверка сообщений коммитов).
 
 Фронтенд — команды из папки `client/`:
 
@@ -266,6 +269,32 @@ npm run generate:api   # пересобрать src/generated из ../api/openap
 (`{ EventTypes_list, EventTypes_create, … }`). Операции без обработчика
 отвечают `501 not_implemented`, поэтому частично реализованный API честно
 сообщает, что ещё не написано.
+
+## Docker
+
+Бэкенд упакован в образ: при запуске контейнера сервер стартует сам — сначала
+применяется идемпотентная схема БД, затем поднимается Express. В образ входит
+только `server/`; фронтенд хостится отдельно.
+
+Сборка из корня репозитория (контекст — корень, поэтому в `Dockerfile` пути
+начинаются с `server/`):
+
+```bash
+docker build -t call-calendar .
+```
+
+Запуск. Том для SQLite именованный: без него база живёт в слое контейнера и
+теряется при его удалении.
+
+```bash
+docker run --rm -p 3000:3000 -v call-calendar-data:/app/data call-calendar
+# → http://localhost:3000/health  →  { "status": "ok" }
+```
+
+Переменные окружения (`PORT`, `DB_PATH`, `NODE_ENV`) задаются при запуске,
+например `-e PORT=8080 -p 8080:8080`. Образ объявляет `HEALTHCHECK` на
+`/health` — тот же эндпоинт, что использует `npm run smoke`; его же проверяет
+job `docker` в CI.
 
 ## Соглашение о коммитах
 

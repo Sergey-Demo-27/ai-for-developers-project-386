@@ -45,13 +45,19 @@ committed.
 - Conventional Commits are enforced locally and in CI; header ≤ 72 chars, allowed
   scopes: `server`, `client`, `db`, `api`, `ui`, `ci`, `deps`, `docs`, `main`
   (`main` — для авто‑коммитов release-please); see `CONTRIBUTING.md`.
-- CI `ci.yml` runs four jobs: `server` (`npm ci` → `lint` →
+- CI `ci.yml` runs five jobs: `server` (`npm ci` → `lint` →
   `git diff --exit-code -- src/generated` → `test` → `migrate` → `smoke`),
   `client` (`npm ci` → `lint` → `test` → `build` →
   `git diff --exit-code -- src/shared/api/generated`), `api`
-  (`npm ci` → `lint` → `build` → `git diff --exit-code -- openapi`) and
+  (`npm ci` → `lint` → `build` → `git diff --exit-code -- openapi`),
+  `docker` (`docker build` → run the container → wait for `/health`) and
   `commitlint`. `release-please` versions `server/` and `client/` separately;
   `api/` is not versioned.
+- The root `Dockerfile` packages only `server/` (the client is a separate SPA,
+  not served by Express). At container start the `CMD` applies the idempotent
+  schema (`node src/db/migrate.js`) and then `exec`s the server, so the app
+  boots on its own; `DB_PATH` defaults to `/app/data/prod.db`, meant for a
+  mounted volume. Build context is the repo root — see `.dockerignore`.
 - The API contract lives in `api/` as TypeSpec. `api/openapi/openapi.yaml` is
   generated and committed — never edit it by hand: change the `.tsp`, run
   `npm run build` in `api/`, and commit the regenerated file, or the `api` CI
