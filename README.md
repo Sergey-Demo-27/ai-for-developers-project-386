@@ -8,6 +8,9 @@
 Учебный проект Хекслета: https://ru.hexlet.io/programs/ai-for-developers
 Как это должно работать: https://files.hexlet.app/a/2ipc5m
 
+**Демо:** <https://ai-for-developers-project-386-1-ivs7.onrender.com> — Render,
+free-план: первый заход после простоя может занять до минуты.
+
 ## Стек
 
 Бэкенд:
@@ -295,6 +298,24 @@ docker run --rm -p 3000:3000 -v call-calendar-data:/app/data call-calendar
 например `-e PORT=8080 -p 8080:8080`. Образ объявляет `HEALTHCHECK` на
 `/health` — тот же эндпоинт, что использует `npm run smoke`; его же проверяет
 job `docker` в CI.
+
+## Деплой
+
+Приложение опубликовано на Render (free-план):
+
+- **Клиент (SPA):** <https://ai-for-developers-project-386-1-ivs7.onrender.com>
+- **API (бэкенд):** <https://ai-for-developers-project-386-tpsk.onrender.com>
+  - проверка живости: [`/health`](https://ai-for-developers-project-386-tpsk.onrender.com/health) → `{ "status": "ok" }`
+
+Бэкенд выкатывается Docker-образом из корневого `Dockerfile`; порт приложение
+берёт из переменной окружения `PORT`, которую Render передаёт сервису
+автоматически (см. раздел [Docker](#docker)). Клиент — Static Site: запросы к
+`/api/...` уходят на бэкенд rewrite-правилом того же origin, поэтому CORS не
+нужен. Состав сервисов и правила описаны в [`render.yaml`](./render.yaml).
+
+На free-плане инстанс засыпает после простоя: первый запрос после паузы может
+занимать до минуты. Файловая система Render эфемерна, поэтому SQLite
+пересоздаётся пустой при каждом деплое и рестарте.
 
 ## Соглашение о коммитах
 
